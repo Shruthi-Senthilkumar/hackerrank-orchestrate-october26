@@ -1,7 +1,18 @@
 """F02 gateway rule: only code/audit/timeview.py and code/audit/loaders.py
 may reference the raw time-dependent tables (system_activity.csv,
 user_audit_log.csv, evidence_files.csv) or the loader functions that read
-them. Every other module under code/audit/ must go through TimeView.
+them. Every other module under code/audit/ must go through TimeView for
+any per-case, audit_at-bounded decision.
+
+code/audit/evidence/registry.py is the one other exemption: per PRD
+section 7.2, evidence ingestion is a single global pass over every
+evidence file, run once before any case loop, independent of any one
+case's audit_at (see its own module docstring). It calls
+load_evidence_files() directly to enumerate every file once; the
+per-case time filter is enforced downstream by its
+`visible_observations`/`visible_coverage`, which only ever consult
+`TimeView.visible_evidence_files()`. No other module may take this
+shortcut.
 
 This is a static-analysis test: it greps source files rather than running
 them, so a future module cannot "accidentally" bypass the gateway without
@@ -29,6 +40,7 @@ GUARDED_FILENAMES = [
 ALLOWED_FILES = {
     AUDIT_DIR / "loaders.py",
     AUDIT_DIR / "timeview.py",
+    AUDIT_DIR / "evidence" / "registry.py",
 }
 
 

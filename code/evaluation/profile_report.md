@@ -95,24 +95,29 @@ Method: for every evidence file, compare `evidence_files.csv`'s `captured_at` ag
 
 ---
 
-## 5. Log families — `dataset/evidence/logs/*.log` (26 files, 16 families)
+## 5. Log families — `dataset/evidence/logs/*.log` (26 files, 10 families)
 
-Line shape is described with placeholders, never real values from the files.
+**Corrected from the first version of this report**, which grouped by the full filename minus only the
+trailing date and over-split these into 15–16 "families" by treating each region/locale suffix
+(`_ap_northeast`, `_eu_west`, ...) as its own family. The real grouping is by **name stem** — the part of
+the filename before the region/locale and date suffixes — giving exactly 10 families across the 26 files
+(`code/tools/profile_dataset.py`'s `LOG_FAMILY_STEMS` makes this explicit rather than inferring it with a
+regex). Line shape is described with placeholders, never real values from the files.
 
 | Family | Files | Line shape (placeholder) | Negative-lookup marker(s) seen |
 |---|---|---|---|
-| `application_trace_ap_northeast`, `application_trace_eu_north` | 1 each | `<ISO ts> [LEVEL] [component] [trace_id] event_name: key="value" ...` | `rows="0"`, `result="miss"`, `http_status="404"` |
-| `cloud_runtime_export_af_south`, `cloud_runtime_export_us_west` | 1 each | `<ISO ts> requestId=<id> level=LEVEL function=<name> message="key=\"value\" ..."` (nested, escaped JSON-in-string) | none observed in these two files |
+| `application_trace` | 2 (`_ap_northeast`, `_eu_north`) | `<ISO ts> [LEVEL] [component] [trace_id] event_name: key="value" ...` | `rows="0"`, `result="miss"`, `http_status="404"` |
+| `cloud_runtime_export` | 2 (`_af_south`, `_us_west`) | `<ISO ts> requestId=<id> level=LEVEL function=<name> message="key=\"value\" ..."` (nested, escaped JSON-in-string) | none observed in these two files |
 | `notification_delivery` | 1 | `<ISO ts> LEVEL service=<name> event=record_lookup seq=<n> system="<sys>" resource_id="<id>" record_type="<CATEGORY>" result="<FOUND\|NOT_FOUND>" subject_reference="<ref>"` | `result="NOT_FOUND"` |
-| `operations_stream_eu_central`, `operations_stream_me_central` | 1 each | `<ISO ts> \| LEVEL \| component \| trace_id \| event_name \| key="value" ...` (pipe-delimited) | `rows="0"`, `result="miss"`, `http_status="404"` |
-| `resource_lookup_trace` | **11** | `<ISO ts> level=LEVEL service=<name> trace_id=<id> event=<name> resource_id=<id> key=value ...` | `rows=0`, `http_status=404` |
+| `operations_stream` | 2 (`_eu_central`, `_me_central`) | `<ISO ts> \| LEVEL \| component \| trace_id \| event_name \| key="value" ...` (pipe-delimited) | `rows="0"`, `result="miss"`, `http_status="404"` |
+| `resource_lookup_trace` | **11** (no region suffix; `_<date>_<time>` only) | `<ISO ts> level=LEVEL service=<name> trace_id=<id> event=<name> resource_id=<id> key=value ...` | `rows=0`, `http_status=404` |
 | `search_index_diagnostic` | 1 | same shape as `notification_delivery` | `result="NOT_FOUND"` |
-| `service_events_ap_south`, `service_events_sa_east` | 1 each | `<ISO ts> level=LEVEL service=<name> instance=<id> pod=<id> region=<region> trace_id=<id> event=<name> key=value ...` (unquoted key=value) | `rows=0`, `result=miss`, `http_status=404` |
-| `structured_service_events_ca_central`, `structured_service_events_eu_west` | 1 each | `<ISO ts> {"severity":"LEVEL","logger":"<name>",...}` (one JSON object per line) | none observed in these two files (would appear as a `"result":"miss"`-style field if present) |
-| `support_replica` | 1 | `<ISO ts> level=LEVEL service=support_replica instance=<id> pod=<id> trace_id=<id> event=<name> resource_id=<id> ...` | none observed |
-| `syslog_archive_ap_southeast`, `syslog_archive_us_east` | 1 each | `<ISO ts> <PRI>1 <node> <app> <procid> - - level=LEVEL key="value" ...` (RFC-5424-flavored syslog) | `rows="0"`, `result="miss"`, `http_status="404"` |
+| `service_events` | 2 (`_ap_south`, `_sa_east`) | `<ISO ts> level=LEVEL service=<name> instance=<id> pod=<id> region=<region> trace_id=<id> event=<name> key=value ...` (unquoted key=value) | `rows=0`, `result=miss`, `http_status=404` |
+| `structured_service_events` | 2 (`_ca_central`, `_eu_west`) | `<ISO ts> {"severity":"LEVEL","logger":"<name>",...}` (one JSON object per line) | none observed in these two files (would appear as a `"result":"miss"`-style field if present) |
+| `support_replica` | 1 (no date/region suffix at all) | `<ISO ts> level=LEVEL service=support_replica instance=<id> pod=<id> trace_id=<id> event=<name> resource_id=<id> ...` | none observed |
+| `syslog_archive` | 2 (`_ap_southeast`, `_us_east`) | `<ISO ts> <PRI>1 <node> <app> <procid> - - level=LEVEL key="value" ...` (RFC-5424-flavored syslog) | `rows="0"`, `result="miss"`, `http_status="404"` |
 
-`resource_lookup_trace` is the one family with 11 files (named `resource_lookup_trace_<date>_<time>.log`); every other family has exactly one file. 15 distinct families × (1 file, except `resource_lookup_trace` × 11) = 26 files.
+10 families: 9 with 1–2 files each (15 files) plus `resource_lookup_trace` with 11 files = 26 files total.
 
 A "negative observation" across every family takes one of: `rows=0`/`rows="0"`, `result=miss`/`result="miss"`, `result="NOT_FOUND"`, or `http_status=404`/`http_status="404"`. A positive observation is `rows=1`/`rows="1"`, `result="hit"`, or `result="FOUND"`.
 

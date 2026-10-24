@@ -12,21 +12,9 @@ Evidence or activity captured strictly after audit_at must never be
 returned, cited, or used to decide anything for that case.
 """
 
-from dataclasses import dataclass
 from datetime import datetime
 
 from . import loaders
-
-
-class RawDataAccessError(RuntimeError):
-    """Raised when code tries to bypass TimeView for time-dependent data."""
-
-
-_GUARDED_LOADER_NAMES = {
-    "load_system_activity",
-    "load_user_audit_log",
-    "load_evidence_files",
-}
 
 
 class TimeView:
@@ -52,13 +40,21 @@ class TimeView:
         return [e for e in self._all_evidence_files if self.is_visible(e.captured_at)]
 
 
-@dataclass(frozen=True)
-class TimestampDisagreement:
-    file_id: str
-    manifest_captured_at: datetime
-    internal_timestamp: datetime
-    internal_label: str
-
-
 def build_time_view(audit_at: datetime) -> TimeView:
     return TimeView(audit_at)
+
+
+def all_audit_log_entries() -> list[loaders.AuditLogEntry]:
+    """The complete, unfiltered identity audit log.
+
+    The one sanctioned escape hatch from per-case `<= audit_at`
+    visibility: code/audit/identity.py's as-of-any-timestamp
+    reconstruction must legitimately see entries on both sides of its
+    reference time (to "undo" a change that happened after it and
+    recover the value held before it), and must find every user who
+    ever held a given email across all history before bounding that
+    user's identity set to one case's audit_at. That still goes through
+    this module -- the one place allowed to call
+    loaders.load_user_audit_log() -- rather than reading it directly.
+    """
+    return loaders.load_user_audit_log()

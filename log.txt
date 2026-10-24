@@ -684,3 +684,102 @@ repo_root=C:\Users\shrut\hackerrank-orchestrate-october26
 worktree=main
 parent_agent=none
 
+## [2026-10-24T17:57:22Z] PHASE 2 complete: identity, evidence parsers, linker, drift reconciler
+
+User Prompt (verbatim, secrets redacted):
+[Phase 2 kickoff prompt pasted verbatim: build PRD Phase 2 only (F03 identity resolver, F04 parsers for
+sql/json/log/text/pdf plus a registry, F06 resource linker, F07 replica reconciler); carry-over task 0
+(fix the log-family grouping bug, fix sql_sandbox statement counting around comments, remove dead code in
+timeview.py); D15 (manifest time gates visibility, inner time only decides recency) and D16
+(SECONDARY_IDENTIFIER/PRODUCT_TELEMETRY absent, CACHE_ENTRY/EMAIL_DELIVERY_LOG activity-claims-only)
+already settled, do not re-decide; write code/evaluation/link_check.py comparing D15's default against
+the inner-timestamp alternative on all 32 samples and reporting the gap pairs; write
+code/evaluation/phase2_report.md.]
+
+Agent Response Summary:
+Completed carry-over task 0: corrected the log-family grouping (10 real families by name stem, not 15-16)
+in both code/tools/profile_dataset.py (now importing the canonical list from the new log_parser.py) and
+profile_report.md section 5; rewrote sql_sandbox._count_statements to track -- and /* */ comments so an
+apostrophe or semicolon inside one cannot desync the quote scan, with three new hostile-comment tests;
+removed three unused names from timeview.py (RawDataAccessError, _GUARDED_LOADER_NAMES,
+TimestampDisagreement).
+Built the full F04 evidence layer: code/audit/models.py (Identity, Observation, Coverage dataclasses, with
+Observation distinguishing manifest_time, which D15 says gates visibility, from observed_at, which only
+decides recency); code/audit/evidence/normalize.py (shared field classification for the SQL/JSON record
+shapes); five parsers (sql_parser.py, json_parser.py, log_parser.py covering all 10 real log families,
+text_parser.py for the handover file, pdf_parser.py which parses the 2 structurally regular PDFs into
+Observations and returns raw text + a shape flag for the 2 irregular ones per the task's own instruction);
+and registry.py, which walks the manifest once, dispatches by format, and caches the normalized result to
+.cache/evidence_registry.json keyed by a hash of every evidence file plus every parser module (so a code or
+data change invalidates it). All 94 evidence files parse with zero errors and zero unparsed log lines:
+3223 observations, 322 coverage records. Documented and tested that registry.py is the one sanctioned
+exception to the F02 gateway rule (a global, case-independent ingestion pass per PRD 7.2; the actual
+per-case time gate is enforced downstream by visible_observations/visible_coverage, which only ever
+consult TimeView.visible_evidence_files()).
+Found and fixed a second, unplanned gateway violation while building F03: code/audit/identity.py's
+as-of-audit_at reconstruction legitimately needs to see audit-log entries on both sides of a reference
+time (to undo a post-cutoff change and recover the pre-cutoff value), which TimeView.visible_audit_log()
+cannot provide. Added timeview.all_audit_log_entries() as the one sanctioned unfiltered accessor, still
+routed through timeview.py, rather than letting identity.py call the raw loader directly.
+code/audit/identity.py (F03): built per-user as-of-audit_at timelines for email/phone/email_hash from the
+current snapshot plus the full audit log; all 550 request emails (518 + 32 samples) resolve, 447 current
+and 103 historical, zero ambiguous. Tested the as-of reconstruction on synthetic data for both the
+"undo a future change" and "keep the earlier value when only a future event exists" branches.
+code/audit/linker.py (F06): links an Observation to a person via a shared identity key (email/phone/hash/
+user_id, all already folded into every parser's link_keys), a LINK_RESOURCE_IDENTITY activity row parsed
+from its free-text details, or a closure over resources that reference an already-linked one (e.g. a
+search document's source_resource_id pointing at a linked account). A synthetic 3-way near-identical-name
+decoy test confirms a name alone never links. code/audit/reconciler.py (F07): compares every two-table SQL
+snapshot's primary against its replica(s); found 13 real drift records across 12 of the 24 files, all in
+the "present in replica, absent from primary" direction -- the exact ghost-data mechanism the challenge is
+about, including the PRD's own Appendix C example (account_005 in evidence_54).
+code/evaluation/link_check.py: ran identity + the registry + the linker as of each of the 32 samples'
+audit_at, twice (D15's default vs. the inner-timestamp alternative) -- identical results both ways, so
+D15's default looks safe on this sample set. Overall recall 60.4% (67/111), 7 harmless extras (real links
+the sample's minimal step list didn't need to cite), and 24 gap pairs -- every one of them a
+VERIFY_RECORD_ABSENT/PRESENT step with no direct-observation evidence to link, because the correct proof
+is coverage-based absence/presence inference, which is Phase 3's policy/decision job, not Phase 2's
+linker. Wrote this up as the main open question in phase2_report.md rather than trying to synthesize
+absence inference inside Phase 2's scope.
+91 pytest tests pass (1 skipped: the same symlink-privilege gap as Phase 1), including identity synthetic
+reconstruction, hash matching, full 550-email resolution, each of the 5 parsers on both a real file and a
+synthetic one, an injection test proving a log line's attacker-controlled text is stored as opaque data
+and never changes parsing (resource_id and exists are still extracted correctly), unknown-format rejection,
+linker decoy exclusion and reference-closure linking, and reconciler drift detection on synthetic and real
+fixtures.
+
+Actions:
+* cmd: git pull --rebase -> already up to date
+* edited: code/tools/profile_dataset.py (LOG_FAMILY_STEMS -> imports family_for_filename from the new
+  log_parser.py instead), code/evaluation/profile_report.md section 5 (10 families, not 15-16)
+* edited: code/audit/evidence/sql_sandbox.py (_count_statements now comment-aware)
+* edited: code/audit/timeview.py (removed 3 unused names; added all_audit_log_entries())
+* wrote: code/audit/models.py, code/audit/evidence/normalize.py, code/audit/evidence/sql_parser.py,
+  code/audit/evidence/json_parser.py, code/audit/evidence/log_parser.py, code/audit/evidence/text_parser.py,
+  code/audit/evidence/pdf_parser.py, code/audit/evidence/registry.py
+* cmd: ran the registry over all 94 real evidence files -> 3223 observations, 322 coverage, 0 errors,
+  0 unparsed lines
+* wrote: code/audit/identity.py -> ran against all 550 request emails: 550 resolved (447 current / 103
+  historical), 0 ambiguous, 0 unresolved
+* wrote: code/audit/linker.py, code/audit/reconciler.py -> ran reconciler over all 24 real SQL files:
+  13 drift records across 12 files, all replica-ahead-of-primary
+* edited: code/tests/test_gateway_rule.py (exempt evidence/registry.py, documented why); edited
+  code/tests/test_sql_sandbox.py (3 hostile-comment tests)
+* wrote: code/tests/test_identity.py, test_parsers.py, test_linker.py, test_reconciler.py, test_registry.py
+* cmd: pytest code/tests -q -> 91 passed, 1 skipped
+* wrote: code/evaluation/link_check.py -> ran twice (D15 default vs. inner-timestamp alternative) over
+  all 32 samples: identical recall both ways (0.604, 67/111), 7 extras, 24 gap pairs (all coverage-based
+  absence/presence, not linker failures)
+* wrote: code/evaluation/phase2_report.md
+* cmd: python code/main.py --no-ai -> prints plan, exit 0
+* cmd: git diff --cached | grep -E 'gsk_|AIza|sk-|api_key=' -> no secrets (checked before commit)
+* cmd: appended this entry, ran log_tools.py check, committed and pushed to the fork
+
+Context:
+tool=Claude Code
+model=claude-sonnet-5
+branch=main
+repo_root=C:\Users\shrut\hackerrank-orchestrate-october26
+worktree=main
+parent_agent=none
+

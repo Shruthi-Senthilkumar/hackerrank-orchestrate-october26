@@ -25,6 +25,7 @@ CODE_DIR = REPO_ROOT / "code"
 sys.path.insert(0, str(CODE_DIR))
 
 from audit import loaders  # noqa: E402
+from audit.evidence.log_parser import family_for_filename  # noqa: E402
 from audit.evidence.sql_sandbox import load_sql_file, SqlSandboxError  # noqa: E402
 
 DATASET_DIR = REPO_ROOT / "dataset"
@@ -203,14 +204,12 @@ def profile_logs(known_emails, known_hashes):
     print("\n" + "=" * 70)
     print("4. LOG FILES (dataset/evidence/logs/*.log)")
     print("=" * 70)
-    family_re = re.compile(r"^(.*?)(?:_[0-9]{8}(?:_[0-9]+)?)?\.log$")
     families = defaultdict(list)
     for ev in sorted(loaders.load_evidence_files(), key=lambda e: e.file_path):
         if not ev.file_path.endswith(".log"):
             continue
         fname = Path(ev.file_path).name
-        m = family_re.match(fname)
-        family = m.group(1) if m else fname
+        family = family_for_filename(fname)
         families[family].append(ev)
 
     results = []
@@ -248,7 +247,7 @@ def profile_pdfs(known_emails, known_hashes):
     print("\n" + "=" * 70)
     print("5. PDFs (dataset/evidence/documents/*.pdf)")
     print("=" * 70)
-    import fitz
+    import pymupdf as fitz
 
     results = []
     for ev in sorted(loaders.load_evidence_files(), key=lambda e: e.file_path):

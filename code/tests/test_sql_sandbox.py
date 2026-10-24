@@ -6,7 +6,12 @@ sys.path.insert(0, str(REPO_ROOT / "code"))
 
 import pytest  # noqa: E402
 
-from audit.evidence.sql_sandbox import load_sql_file, SqlSandboxError, MAX_STATEMENTS  # noqa: E402
+from audit.evidence.sql_sandbox import (  # noqa: E402
+    load_sql_file,
+    SqlSandboxError,
+    MAX_STATEMENTS,
+    _count_statements,
+)
 
 REAL_SQL_DIR = REPO_ROOT / "dataset" / "evidence" / "databases"
 
@@ -61,6 +66,34 @@ def test_hostile_statement_rejected_at_load(tmp_path, name, sql):
     # and no stray file created alongside it
     assert path.read_text(encoding="utf-8") == sql
     assert not (tmp_path / "evil.db").exists()
+
+
+def test_statement_count_ignores_apostrophe_inside_line_comment():
+    sql = "-- it's a hostile comment with an apostrophe\nCREATE TABLE t(x);\nINSERT INTO t VALUES(1);\n"
+    assert _count_statements(sql) == 2
+
+
+def test_statement_count_ignores_semicolon_and_quote_inside_block_comment():
+    sql = (
+        "/* this comment has a ; and an apostrophe ' inside it */\n"
+        "CREATE TABLE t(x);\n"
+        "INSERT INTO t VALUES('a;b');\n"
+    )
+    assert _count_statements(sql) == 2
+
+
+def test_hostile_comment_with_apostrophe_does_not_desync_the_real_sandbox(tmp_path):
+    sql = (
+        "-- it's a hostile comment; ATTACH DATABASE 'evil.db' AS evil;\n"
+        "CREATE TABLE t(x);\n"
+        "INSERT INTO t VALUES(1);\n"
+    )
+    path = tmp_path / "hostile_comment.sql"
+    path.write_text(sql, encoding="utf-8")
+    snap = load_sql_file(path)
+    assert snap.tables() == ["t"]
+    assert snap.row_count("t") == 1
+    snap.close()
 
 
 def test_oversized_statement_count_rejected(tmp_path):

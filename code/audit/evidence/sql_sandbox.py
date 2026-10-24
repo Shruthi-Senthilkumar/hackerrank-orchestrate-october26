@@ -56,17 +56,58 @@ class SqlSandboxError(RuntimeError):
 
 
 def _count_statements(sql_text: str) -> int:
-    """Count top-level ';'-terminated statements, ignoring ';' inside quotes."""
+    """Count top-level ';'-terminated statements.
+
+    Ignores ';' (and everything else) inside a single- or double-quoted
+    string, a `-- ` line comment, or a `/* ... */` block comment, so a
+    stray quote character inside a comment cannot desync the scan.
+    """
     count = 0
     in_single = False
     in_double = False
-    for ch in sql_text:
-        if ch == "'" and not in_double:
-            in_single = not in_single
-        elif ch == '"' and not in_single:
-            in_double = not in_double
-        elif ch == ";" and not in_single and not in_double:
+    in_line_comment = False
+    in_block_comment = False
+    i = 0
+    n = len(sql_text)
+    while i < n:
+        ch = sql_text[i]
+        if in_line_comment:
+            if ch == "\n":
+                in_line_comment = False
+            i += 1
+            continue
+        if in_block_comment:
+            if ch == "*" and i + 1 < n and sql_text[i + 1] == "/":
+                in_block_comment = False
+                i += 2
+                continue
+            i += 1
+            continue
+        if in_single:
+            if ch == "'":
+                in_single = False
+            i += 1
+            continue
+        if in_double:
+            if ch == '"':
+                in_double = False
+            i += 1
+            continue
+        if ch == "-" and i + 1 < n and sql_text[i + 1] == "-":
+            in_line_comment = True
+            i += 2
+            continue
+        if ch == "/" and i + 1 < n and sql_text[i + 1] == "*":
+            in_block_comment = True
+            i += 2
+            continue
+        if ch == "'":
+            in_single = True
+        elif ch == '"':
+            in_double = True
+        elif ch == ";":
             count += 1
+        i += 1
     return count
 
 
@@ -152,6 +193,20 @@ class SandboxedSnapshot:
 
     def row_count(self, table: str) -> int:
         return self.query(f'SELECT COUNT(*) FROM "{table}"')[0][0]
+
+    def columns(self, table: str) -> list[str]:
+        """Column names for `table`, via cursor.description (PRAGMA
+        table_info is denied post-load, so this avoids needing it)."""
+        deadline = time.monotonic() + QUERY_TIMEOUT_S
+        self.connection.set_progress_handler(
+            _make_progress_handler(deadline), PROGRESS_HANDLER_N_INSTRUCTIONS
+        )
+        cur = self.connection.execute(f'SELECT * FROM "{table}" LIMIT 0')
+        return [d[0] for d in cur.description]
+
+    def rows_as_dicts(self, table: str) -> list[dict]:
+        cols = self.columns(table)
+        return [dict(zip(cols, row)) for row in self.query(f'SELECT * FROM "{table}"')]
 
     def query(self, sql: str, params: tuple = ()) -> list[tuple]:
         deadline = time.monotonic() + QUERY_TIMEOUT_S
