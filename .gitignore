@@ -13,6 +13,7 @@ __pycache__/
 .DS_Store
 
 # submission artifacts are built locally, never committed
+submission/
 code.zip
 agent-trace/
 agent-trace.zip
