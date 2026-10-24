@@ -14,7 +14,7 @@ import re
 import sys
 from pathlib import Path
 
-ENTRY_RE = re.compile(r"^## (\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z) (.+)$")
+ENTRY_RE = re.compile(r"^## \[?(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z)\]? (.+)$")  # AGENTS.md 5.2 uses brackets; early entries do not
 BAD_VALUES = {"", "unknown", "ai", "claude", "llm", "assistant", "n/a", "none"}
 SECRET_PATTERNS = {
     "groq-style key": re.compile(r"gsk_[A-Za-z0-9]{20,}"),
