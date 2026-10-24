@@ -39,6 +39,93 @@ python3 code/main.py
 
 The blank template at `dataset/output.csv` is provided as a reference. Your final generated file for submission must be the root-level `output.csv`.
 
+---
+
+## Setup and Run
+
+Status as of Phase 0: repo skeleton, virtual environment, and provider smoke
+tests only. **The audit pipeline itself is not implemented yet** —
+`python code/main.py` currently prints the planned pipeline and exits without
+auditing any case. `code/evaluation/main.py` is an empty stub. Evaluation
+reports under `code/evaluation/` are placeholders. This section will be
+updated as later phases land.
+
+### 1. Clone and enter the repo
+
+```bash
+git clone https://github.com/interviewstreet/hackerrank-orchestrate-october26.git
+cd hackerrank-orchestrate-october26
+```
+
+### 2. Create the virtual environment (Python 3.11)
+
+**Windows (PowerShell):**
+
+```powershell
+python -m venv .venv
+.venv\Scripts\activate
+pip install -r code/requirements.txt
+```
+
+**macOS / Linux:**
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r code/requirements.txt
+```
+
+Keep `.venv` at the repository root, outside `code/`. It is git-ignored.
+
+### 3. Set your API keys
+
+Copy `.env.example` to `.env` in the repo root and fill in both keys. `.env`
+is git-ignored and must never be committed, printed, or logged.
+
+```text
+GROQ_API_KEY=
+GEMINI_API_KEY=
+```
+
+Check that both keys are present without ever printing their values:
+
+```bash
+python code/tools/check_keys.py
+```
+
+This prints only `set` or `missing` per key.
+
+### 4. Run the pipeline (not yet implemented)
+
+```bash
+python code/main.py                 # full pipeline; currently prints the plan only
+python code/main.py --no-ai         # rules-only baseline; currently prints the plan only
+python code/main.py --cases case_01 # debug a single case id; currently prints the plan only
+```
+
+### 5. Run evaluation (not yet implemented)
+
+```bash
+python code/evaluation/main.py
+```
+
+### 6. Run tests
+
+```bash
+pytest code/tests
+```
+
+`code/tests` has no test modules yet in Phase 0, so this may collect zero
+tests; that is expected. `code/tests/smoke_providers.py` is a standalone
+script (not a pytest test) that makes one tiny Groq call and one tiny Gemini
+call and prints only provider, model ID, `ok` or an error class plus HTTP
+status, input/output tokens, and latency — never keys or response bodies:
+
+```bash
+python code/tests/smoke_providers.py
+```
+
+---
 
 ## Dataset
 
