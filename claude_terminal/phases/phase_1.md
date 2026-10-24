@@ -2,7 +2,7 @@
 
 Goal: safe loaders, one time-travel gateway, a sandboxed SQL reader that works on the real snapshots, and a profile of every evidence file. No audit logic yet and no model calls.
 
-Before you paste: read the Groq and Google AI Studio consoles and fill the `CONSOLE LIMITS` block in the prompt with what you see (write `unknown` for anything you have not read; the terminal then keeps the TODO-VERIFY placeholders).
+Before you paste: the `CONSOLE LIMITS` block is already filled from the official Groq docs and from third-party reports for Gemini. Spend 2 minutes in Google AI Studio (rate limit / usage page for your project) and, if its numbers differ, edit that block before pasting.
 Then run `git pull --rebase` so you have this file and `claude_terminal/DECISIONS.md`.
 
 ## Paste this into the Claude terminal
@@ -22,11 +22,11 @@ SCOPE: PRD Phase 1 ONLY, plus the carry-over items below. No identity resolution
 
 PROJECT RULES: never hardcode case, evidence, user or resource IDs in logic or prompts; use only files under dataset/; use only information available at or before each case's audit_at; models only extract facts and code decides; keys only from environment variables; deterministic output. Ask me before deciding anything the PRD marks [CALIBRATE] or [VERIFY] when the data does not answer it.
 
-CONSOLE LIMITS (I filled these in; "unknown" means I have not read them yet)
-- Groq qwen/qwen3.8-27b: requests/min = unknown, tokens/min = unknown, requests/day = unknown, tokens/day = unknown
-- Gemini gemini-3.8-flash: requests/min = unknown, tokens/min = unknown, requests/day = unknown
-- Gemini gemini-3.1-flash-lite: requests/min = unknown, tokens/min = unknown, requests/day = unknown
-Update code/config.py with every value that is not "unknown" and remove its TODO-VERIFY marker. Keep the marker on the rest.
+CONSOLE LIMITS (looked up by my reviewer on 2026-10-24; I will confirm the unconfirmed ones in the consoles)
+- Groq qwen/qwen3.8-27b, from Groq's official rate-limits docs: 30 requests/min, 1,000 requests/day, 8,000 tokens/min, 200,000 tokens/day. Limits apply per organization; the docs table does not say which plan it describes, so treat as documented, not console-confirmed.
+- Gemini gemini-3.8-flash, free tier: about 20 requests/day. NOT official: Google no longer publishes free-tier numbers on its docs page (it says to look in AI Studio); two third-party pages and a Google AI forum thread agree on ~20/day. RPM and TPM are unknown.
+- Gemini gemini-3.1-flash-lite, free tier: about 500 requests/day. Same caveat. RPM and TPM unknown.
+Update code/config.py: set the Groq values and remove their TODO-VERIFY marker only for the four Groq numbers; set GEMINI_REQUESTS_PER_DAY to 20 for gemini-3.8-flash and 500 for gemini-3.1-flash-lite as separate constants, keep TODO-VERIFY on every Gemini number, and keep the existing conservative Gemini RPM/TPM placeholders. Every Gemini call we already made today counts against the Flash budget, so never call gemini-3.8-flash in Phase 1 except through the capability probe (use gemini-3.1-flash-lite there).
 
 FACTS I ALREADY VERIFIED ON THE SQL SNAPSHOTS (confirm them, do not take them on trust)
 - The 24 files in dataset/evidence/databases/ contain only these statement kinds: BEGIN, COMMIT, CREATE TABLE, CREATE INDEX, INSERT, comments, and `PRAGMA foreign_keys=ON;` (in 11 files). I found no ATTACH, DETACH, trigger, view or other PRAGMA.
