@@ -436,6 +436,7 @@ Actions:
 * cmd: git fetch -> no new commits on origin/main
 * edited: claude_terminal/phases/phase_1.md (task 0a, PROJECT RULES model list), claude_terminal/DECISIONS.md (D1, D3, D6, D9 statuses; new D10-D14)
 * cmd: appended three log entries, ran log_tools.py check, committed and pushed to the fork
+* edited: claude_terminal/phases/phase_1.md (fixed a contradiction: Flash is never called in Phase 1; the probe uses Flash-Lite), pushed as a follow-up commit
 
 Context:
 tool=Claude Code
