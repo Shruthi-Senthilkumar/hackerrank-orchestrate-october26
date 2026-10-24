@@ -823,3 +823,106 @@ branch=main
 repo_root=/home/claude/hackerrank-orchestrate-october26
 worktree=main
 parent_agent=none
+## [2026-10-24T18:19:30Z] PHASE 2b complete: trace correlation fixes 8 of 20 unlinked pairs
+
+User Prompt (verbatim, secrets redacted):
+[Phase 2b kickoff prompt pasted verbatim: fix-up of Phase 2's linker recall gap only, no Phase 3 work.
+Diagnose all 44 missing pairs per-case (coverage-based vs. observed-but-unlinked, with file/record/
+identifier detail); explain the one possible false link; add a generic trace_id-based link_keys
+correlation to the log parser and a trace_correlation rule to the linker, handling only trace-like keys
+the data actually reuses; investigate every other grounded connection for the remaining unlinked
+observations without inventing anything (no ID-number patterns, no time windows, no ordering); rerun
+link_check (both D15 variants) and split the remaining gap into coverage-based vs. unexplained; answer
+the five Phase 2 open questions as already decided by the user; add decoy/injection/visibility tests;
+quality gates; commit and push.]
+
+Agent Response Summary:
+Diagnosed all 44 originally-missing pairs: 24 are coverage-based (resource never appears in any visible
+Observation; unchanged, Phase 3's job) and 20 were observed but left unlinked. Found the exact mechanism
+for all 20 by reading the raw log lines: each resource-bearing line (e.g. profile_lookup_completed) sits
+in the same trace_id as an earlier, identifier-bearing line (profile_lookup_started with a lookup_key,
+subject_ref, subject_key or correlation_key) that carries no resource_id of its own -- so neither line
+alone had both pieces, and the old linker never connected them.
+Implemented trace correlation as a generic mechanism, not a per-case rule: code/audit/evidence/
+log_parser.py now extracts a TraceHint(trace_id, value, event_time, source_id) from every line with a
+trace_id and an identifier-like value, whether or not that line has a resource_id; code/audit/evidence/
+registry.py caches these per file and exposes visible_trace_hints(reg, time_view), gated by BOTH the
+file's manifest visibility (D15) and the hint's own line event_time <= audit_at (a stricter, line-level
+check specific to this rule); code/audit/linker.py's link_observations gained a trace_hints parameter and
+a trace_correlation rule. Surveyed every trace-like key the profile found: trace_id is the only one
+actually reused across multiple lines in this dataset (9 of 10 log families); requestId (the
+cloud_runtime_export analog) is unique per line everywhere checked, so it was not implemented as a
+correlation key; correlation_id does not appear in the data at all. This fixed 8 of the 20 pairs
+(case_10, case_12, case_15 x2, case_17 x2, case_19 x2); recall rose from 0.604 to 0.676 (67/111 ->
+75/111); both D15 variants still give identical results.
+Investigated case_17's "possible false link" (an extra account linked alongside a missing one) in full:
+it is NOT a false link -- the extra account is linked by the exact same grounded mechanism (a real email
+match on its trace's opening line), a second genuine account lookup for the same person that also
+returned not-found; the sample's minimal step list just didn't cite it, same as Phase 2's harmless
+"extra" pairs.
+For the remaining 12 unexplained pairs (case_03, case_04, and 10 service_resource_export/analytics pairs
+across case_21/25/26/27/28), exhaustively checked every connection the data offers -- LINK_RESOURCE_IDENTITY
+activity (all 12 rows), every other evidence file's raw text for the literal resource_id, shared trace_id
+where applicable, and the customer_data_snapshot_bundle family specifically (the one format proven to
+carry pre-anonymization identifiers). Found that 7 of the 10 service_resource_export pairs DO have a real
+identifier in an EARLIER bundle snapshot -- but that bundle's own manifest captured_at is after these
+cases' audit_at, so D15 correctly excludes it; using it would mean citing evidence from the future. The
+other 5 (case_03, case_04, and 3 of the service_resource_export pairs) have no identifier anywhere, ever,
+in any evidence file. Did not invent a rule for any of these 12; listed them in
+code/evaluation/phase2b_report.md with exactly what was checked, per the task's explicit instruction, and
+flagged them for the user's decision.
+Updated code/evaluation/phase2_report.md's stale claim that every sample resolves through direct identity
+keys and that 60% recall is entirely coverage-based; it now points to phase2b_report.md for the corrected
+split and numbers. Answered the five Phase 2 open questions as the user had already decided, and
+surfaced one concrete consequence of decision 5 (keep the 2 irregular PDFs as raw text): of the 13
+distinct evidence_ids cited across all 32 sample answers, exactly one is a PDF (evidence_58, cited by
+case_07 for a support_platform finding whose resource_id and identifier both appear in that PDF's
+extracted text) and zero are images -- so case_07 cannot resolve without either a future PDF-parsing pass
+or a Phase 3-level search over the raw text this parser already returns.
+Added code/tests/test_trace_correlation.py: trace correlation links a resource through a synthetic trace;
+a decoy trace with the same resource type but another person's identifier does not link; a trace line
+dated after audit_at is ignored even though its file is visible; an injected instruction-like string in
+an unrelated field changes nothing and is stored as opaque data; file-level visibility (D15) is still
+enforced upstream by the registry. All 96 tests pass (1 skipped, same symlink-privilege gap as before);
+the gateway test is unaffected (trace correlation reads only already-parsed Observations/TraceHints, never
+the raw guarded tables).
+
+Actions:
+* cmd: git pull --rebase -> fast-forwarded in a prior turn; confirmed phase_2b.md matches the pasted prompt
+* cmd: investigated all 44 missing pairs: built a diagnostic script classifying coverage-based (24) vs.
+  observed-but-unlinked (20); read the raw log lines for all 20 to find the shared-trace_id mechanism
+* edited: code/audit/evidence/log_parser.py (TraceHint extraction via _identifier_values(), subject_key
+  added to the identifier-key set, requestId/correlation_id surveyed and found not reused)
+* edited: code/audit/models.py (new TraceHint dataclass)
+* edited: code/audit/evidence/registry.py (trace_hints_by_file, visible_trace_hints, cache schema update)
+* edited: code/audit/linker.py (trace_hints parameter, trace_correlation rule)
+* cmd: ran link_check.py before/after -> recall 0.604 -> 0.676 (67/111 -> 75/111); both D15 variants
+  still identical; rule_counts now includes trace_correlation=9
+* cmd: investigated case_17's extra account link -> confirmed genuine (real email match on its own
+  trace), not a false positive
+* cmd: investigated all 12 remaining unexplained pairs against LINK_RESOURCE_IDENTITY activity, every
+  other evidence file's raw text, and the customer_data_snapshot_bundle family -> found 7 of 10 have a
+  real identifier only in a file captured after audit_at (correctly excluded by D15); 5 have no
+  identifier anywhere, ever
+* wrote: code/evaluation/phase2b_report.md (full diagnosis table, false-link explanation, trace-key
+  survey, the 12 unexplained pairs with exactly what was checked, before/after numbers, the 5 open
+  questions answered, the evidence_58/case_07 PDF dependency finding)
+* edited: code/evaluation/phase2_report.md (corrected the stale "every sample resolves via direct
+  identity keys" claim, pointed to phase2b_report.md)
+* edited: code/evaluation/link_check.py (trace_hints wired through both D15 variants; gap_pairs split
+  into coverage_based_gaps/unexplained_gaps; rule_counts added)
+* wrote: code/tests/test_trace_correlation.py; edited code/tests/test_parsers.py (3-tuple
+  parse_log_file unpacking)
+* cmd: pytest code/tests -q -> 96 passed, 1 skipped
+* cmd: python code/main.py --no-ai -> prints plan, exit 0
+* cmd: git diff --cached | grep -E 'gsk_|AIza|sk-|api_key=' -> no secrets
+* cmd: appended this entry, ran log_tools.py check, committed and pushed to the fork
+
+Context:
+tool=Claude Code
+model=claude-sonnet-5
+branch=main
+repo_root=C:\Users\shrut\hackerrank-orchestrate-october26
+worktree=main
+parent_agent=none
+

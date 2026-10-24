@@ -22,7 +22,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(REPO_ROOT / "code"))
 
 from audit import identity, loaders  # noqa: E402
-from audit.evidence.registry import build_registry, RegistryResult  # noqa: E402
+from audit.evidence.registry import build_registry, RegistryResult, visible_trace_hints  # noqa: E402
 from audit.linker import link_observations  # noqa: E402
 from audit.models import Observation  # noqa: E402
 from audit.timeview import TimeView, build_time_view  # noqa: E402
@@ -55,7 +55,9 @@ def run_link_check(strict_inner_timestamp: bool) -> dict:
     total_expected = 0
     total_matched = 0
     total_extra = 0
-    gap_pairs: list[tuple[str, str, str]] = []  # (case_id, system_id, resource_id)
+    coverage_based_gaps: list[tuple[str, str, str]] = []  # not in any visible observation at all
+    unexplained_gaps: list[tuple[str, str, str]] = []  # observed, but the linker still couldn't connect it
+    rule_counts: dict[str, int] = {}
 
     for case_id in sorted(sample_requests, key=lambda c: int(c.split("_")[1])):
         req = sample_requests[case_id]
@@ -76,22 +78,30 @@ def run_link_check(strict_inner_timestamp: bool) -> dict:
             from audit.evidence.registry import visible_observations
 
             obs = visible_observations(reg, time_view)
+        hints = visible_trace_hints(reg, time_view)
 
-        linked = link_observations(obs, ident, time_view)
+        linked = link_observations(obs, ident, time_view, hints)
         linked_pairs = {(l.observation.system_id, l.observation.resource_id) for l in linked}
+        for l in linked:
+            rule_counts[l.rule] = rule_counts.get(l.rule, 0) + 1
 
         matched = linked_pairs & expected
         extra = linked_pairs - expected
         missing = expected - linked_pairs
 
-        # a missing pair is a "gap" if it cannot be reproduced from ANY
-        # visible observation at all (not just the linked ones) -- i.e.
-        # evidence exists but the linker didn't connect it, vs. no
-        # evidence exists for it under this case's audit_at at all.
+        # A missing pair is coverage-based if it cannot be reproduced from
+        # ANY visible observation at all (nothing to link -- the correct
+        # proof is coverage, which is Phase 3's job). Otherwise it is
+        # "unexplained": some observation of the resource IS visible, but
+        # no grounded relationship (identity key, activity,
+        # trace_correlation, reference_closure) connects it to this
+        # person -- these need a human decision, not an invented rule.
         all_resource_ids_seen = {o.resource_id for o in obs}
         for sys_id, rid in sorted(missing):
             if rid not in all_resource_ids_seen:
-                gap_pairs.append((case_id, sys_id, rid))
+                coverage_based_gaps.append((case_id, sys_id, rid))
+            else:
+                unexplained_gaps.append((case_id, sys_id, rid))
 
         per_case[case_id] = {
             "expected": len(expected),
@@ -111,7 +121,9 @@ def run_link_check(strict_inner_timestamp: bool) -> dict:
         "total_expected": total_expected,
         "total_matched": total_matched,
         "total_extra": total_extra,
-        "gap_pairs": gap_pairs,
+        "coverage_based_gaps": coverage_based_gaps,
+        "unexplained_gaps": unexplained_gaps,
+        "rule_counts": rule_counts,
     }
 
 
@@ -123,14 +135,21 @@ def main() -> int:
     print(f"overall recall: {default_result['overall_recall']:.3f} "
           f"({default_result['total_matched']}/{default_result['total_expected']}), "
           f"total extra: {default_result['total_extra']}")
+    print(f"linker rule counts: {default_result['rule_counts']}")
 
     worst = sorted(default_result["per_case"].items(), key=lambda kv: kv[1].get("recall", 0))[:5]
     print("\n5 worst cases by recall:")
     for case_id, info in worst:
         print(f"  {case_id}: {info}")
 
-    print(f"\ngap pairs (not reproducible from any visible evidence, {len(default_result['gap_pairs'])} total):")
-    for g in default_result["gap_pairs"][:20]:
+    print(f"\ncoverage-based gaps (not in any visible observation at all, Phase 3's job, "
+          f"{len(default_result['coverage_based_gaps'])} total):")
+    for g in default_result["coverage_based_gaps"]:
+        print(" ", g)
+
+    print(f"\nunexplained gaps (observed, but no grounded relationship connects it, "
+          f"{len(default_result['unexplained_gaps'])} total):")
+    for g in default_result["unexplained_gaps"]:
         print(" ", g)
 
     print("\n=== D15 alternative (inner/observed_at timestamp also gates visibility) ===")

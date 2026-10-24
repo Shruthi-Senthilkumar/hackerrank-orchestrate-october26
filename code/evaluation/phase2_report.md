@@ -91,20 +91,28 @@ and an earlier value is correctly recovered when the only relevant event is stil
 
 ## 3. Linker (F06) rule counts, measured on the 32 samples
 
+**Corrected in Phase 2b** (`code/evaluation/phase2b_report.md`): this section originally said every
+sample resolves purely through a direct identity-key match, with 60% recall entirely explained by
+coverage-based absence (Phase 3's job). That was only half right. Of the 44 missing expected pairs, 24
+were coverage-based, but 20 were observed in visible evidence and simply left unlinked — a real recall
+gap, not a Phase 3 concern. Phase 2b added a `trace_correlation` rule (a log line's `trace_id` connects a
+resource-bearing line with no identifier of its own to another line of the same trace that does carry
+one) and fixed 8 of those 20. Updated counts:
+
 | Rule | Count |
 |---|---|
 | `identity_key` (direct email/phone/hash/user_id match) | 92 |
 | `activity` (LINK_RESOURCE_IDENTITY activity row) | 0 |
+| `trace_correlation` (shared log trace_id, Phase 2b) | 9 |
 | `reference_closure` (referenced by an already-linked resource) | 0 |
 
-Both the `activity` and `reference_closure` rules are implemented and unit-tested with synthetic decoys
+`activity` and `reference_closure` are implemented and unit-tested with synthetic decoys
 (`code/tests/test_linker.py`), including a 3-way near-identical-name decoy test proving a name alone never
-links (two decoys sharing most of a target's name but a different email/account are correctly excluded).
-Neither rule fires on the 32 public samples — every sample case happens to resolve purely through a direct
-identity-key match. This is worth watching on the 518-case evaluation set, where PRD 3.2 fact 7 says
-`LINK_RESOURCE_IDENTITY` activity exists specifically to resolve harder cases (e.g. `object_` /
-`support_` attachments with no email of their own, or a `source_resource_id` cross-reference like
-`search_documents_primary`'s decoy triplet profiled in Phase 1).
+links. Neither fires on the 32 public samples. This is worth watching on the 518-case evaluation set,
+where PRD 3.2 fact 7 says `LINK_RESOURCE_IDENTITY` activity exists specifically to resolve harder cases
+(e.g. `object_`/`support_` attachments with no email of their own, or a `source_resource_id` cross-reference
+like `search_documents_primary`'s decoy triplet profiled in Phase 1). See `phase2b_report.md` §4 for the
+full updated recall (0.676) and the remaining gap split into coverage-based (24) versus unexplained (12).
 
 ---
 
@@ -129,9 +137,15 @@ test (`code/tests/test_reconciler.py`).
 
 ## 5. link_check.py summary (32 samples, `code/evaluation/link_check.py`)
 
+**Superseded by Phase 2b** (`code/evaluation/phase2b_report.md` §4): recall is now 0.676 (75/111), not
+0.604, after the `trace_correlation` rule. The numbers below are the original Phase 2 figures, kept for
+history; the "24 gap pairs" below are the coverage-based subset only — Phase 2b found a further 20
+pairs (now 12, after the fix) that were observed but unlinked, which is a different thing than a coverage
+gap. Read `phase2b_report.md` first.
+
 | Metric | D15 default | D15 alternative (inner timestamp also gates visibility) |
 |---|---|---|
-| Overall recall | 0.604 (67/111) | 0.604 (67/111) |
+| Overall recall (Phase 2, before trace correlation) | 0.604 (67/111) | 0.604 (67/111) |
 | Total extra pairs | 7 | 7 |
 
 **The two visibility rules give identical results on the 32 samples.** Every nested JSON-bundle snapshot's

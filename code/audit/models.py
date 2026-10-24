@@ -51,6 +51,28 @@ class Observation:
 
 
 @dataclass(frozen=True)
+class TraceHint:
+    """One identifier value seen on a log line that shares a `trace_id`
+    with other lines in the same file, but carries no resource_id of its
+    own (e.g. a "profile_lookup_started" line with a lookup_key but not
+    yet a resolved resource). Used only by code/audit/linker.py's
+    trace_correlation rule: if a hint's value matches a person's
+    identity, every OTHER (resource-bearing) line of the same trace_id,
+    visible at that case's audit_at, belongs to that person too.
+
+    `event_time` is this specific line's own timestamp, kept (not
+    collapsed into the file's single manifest_time) so the
+    trace_correlation rule can ignore a hint whose own line falls after
+    a case's audit_at even though its file is otherwise visible.
+    """
+
+    trace_id: str
+    value: str
+    event_time: datetime
+    source_id: str
+
+
+@dataclass(frozen=True)
 class Coverage:
     """Proof that a store/collection was actually inspected.
 

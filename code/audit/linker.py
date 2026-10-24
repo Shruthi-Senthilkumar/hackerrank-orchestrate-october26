@@ -8,7 +8,21 @@ An Observation belongs to a person iff, at audit_at:
     in link_keys);
 (b) a LINK_RESOURCE_IDENTITY activity visible at audit_at links the
     resource to the person's user_id or email;
-(c) it is referenced by an already-linked resource (e.g. a search
+(c) (Phase 2b) a log line sharing the SAME trace_id as this resource's
+    own log line carries an identifier of the person, even though this
+    resource's own line does not (e.g. a "profile_lookup_started" line
+    has the lookup_key; the later "_completed" line in the same trace
+    has the resource_id but no identifier of its own). Grounded in a
+    real, generic relationship the data actually has -- a shared
+    trace_id within one log file -- never an ID-number pattern or a
+    time window. See code/audit/evidence/log_parser.py's TraceHint and
+    its module docstring for which trace-like keys exist in this
+    dataset (only `trace_id` is ever reused across lines) and which
+    identifier-bearing keys were found (lookup_key, subject_ref/
+    subject_key, correlation_key, match_key, or any email-shaped
+    value). A trace hint whose own line falls after audit_at is
+    ignored, even if its file is otherwise visible.
+(d) it is referenced by an already-linked resource (e.g. a search
     document's source_resource_id pointing at a linked account, or an
     export pointing at a search document) -- computed as a closure over
     shared link_key values.
@@ -26,10 +40,10 @@ from pathlib import Path
 
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-    from audit.models import Identity, Observation
+    from audit.models import Identity, Observation, TraceHint
     from audit.timeview import TimeView
 else:
-    from .models import Identity, Observation
+    from .models import Identity, Observation, TraceHint
     from .timeview import TimeView
 
 _LINK_ACTIVITY_RE = re.compile(
@@ -37,7 +51,7 @@ _LINK_ACTIVITY_RE = re.compile(
     r"([^\s]+@[^\s]+?)\s+and\s+(user_\d+)"
 )
 
-LinkRule = str  # "identity_key", "activity", "reference_closure"
+LinkRule = str  # "identity_key", "activity", "trace_correlation", "reference_closure"
 
 
 @dataclass(frozen=True)
@@ -61,11 +75,29 @@ def _activity_links_visible(time_view: TimeView) -> dict[str, tuple[str, str]]:
     return links
 
 
+def _trace_values_matching_identity(
+    trace_hints: list[TraceHint], identity_keys: set[str]
+) -> dict[str, set[str]]:
+    """trace_id -> the subset of its hinted values that match this
+    identity. Only trace_ids with at least one matching value are kept,
+    so an unrelated trace never has to be considered downstream."""
+    by_trace: dict[str, set[str]] = defaultdict(set)
+    for hint in trace_hints:
+        value = hint.value if hint.value.startswith("user_") else hint.value.strip().lower()
+        if value in identity_keys:
+            by_trace[hint.trace_id].add(value)
+    return by_trace
+
+
 def link_observations(
-    observations: list[Observation], identity: Identity, time_view: TimeView
+    observations: list[Observation],
+    identity: Identity,
+    time_view: TimeView,
+    trace_hints: list[TraceHint] = (),
 ) -> list[LinkedObservation]:
     identity_keys = {identity.user_id} | identity.emails | identity.phones | identity.hashes
     activity_links = _activity_links_visible(time_view)
+    matching_traces = _trace_values_matching_identity(list(trace_hints), identity_keys)
 
     by_resource: dict[str, list[Observation]] = defaultdict(list)
     for obs in observations:
@@ -74,6 +106,10 @@ def link_observations(
 
     resource_keys: dict[str, set[str]] = {
         rid: set().union(*(o.link_keys for o in obs_list)) for rid, obs_list in by_resource.items()
+    }
+    resource_trace_ids: dict[str, set[str]] = {
+        rid: {o.attrs["trace_id"] for o in obs_list if o.attrs.get("trace_id")}
+        for rid, obs_list in by_resource.items()
     }
 
     rule_by_resource: dict[str, LinkRule] = {}
@@ -84,6 +120,9 @@ def link_observations(
         link = activity_links.get(rid)
         if link and (link[0] in identity_keys or link[1] == identity.user_id):
             rule_by_resource[rid] = "activity"
+            continue
+        if resource_trace_ids.get(rid, set()) & matching_traces.keys():
+            rule_by_resource[rid] = "trace_correlation"
 
     # closure: anything referenced by (sharing a link key with) an already
     # linked resource is linked too, via the "reference_closure" rule.

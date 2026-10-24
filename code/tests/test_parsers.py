@@ -102,7 +102,7 @@ def test_json_parser_rejects_a_non_object_top_level(tmp_path):
 
 def test_log_parser_on_a_real_file():
     ev = _real("service_events_ap_south_20260915.log")
-    obs, unparsed = log_parser.parse_log_file(ev, resolve_evidence(ev.file_path))
+    obs, unparsed, _hints = log_parser.parse_log_file(ev, resolve_evidence(ev.file_path))
     assert obs
     assert unparsed == 0
 
@@ -121,7 +121,7 @@ def test_log_line_with_instruction_like_text_changes_nothing(tmp_path):
     path = tmp_path / "resource_lookup_trace_99999999_000000.log"
     path.write_text(injected, encoding="utf-8")
     ev = EvidenceFile(file_id="evidence_synth", file_path=str(path), origin="test", captured_at=AUDIT_AT)
-    obs, unparsed = log_parser.parse_log_file(ev, path)
+    obs, unparsed, _hints = log_parser.parse_log_file(ev, path)
     assert unparsed == 0
     assert len(obs) == 1
     assert obs[0].resource_id == "account_777"
@@ -137,7 +137,7 @@ def test_log_parser_counts_an_unparseable_line():
         path = Path(d) / "resource_lookup_trace_99999999_000000.log"
         path.write_text(path_text, encoding="utf-8")
         ev = EvidenceFile(file_id="evidence_synth", file_path=str(path), origin="test", captured_at=AUDIT_AT)
-        obs, unparsed = log_parser.parse_log_file(ev, path)
+        obs, unparsed, _hints = log_parser.parse_log_file(ev, path)
         assert unparsed == 1
         assert obs == []
 

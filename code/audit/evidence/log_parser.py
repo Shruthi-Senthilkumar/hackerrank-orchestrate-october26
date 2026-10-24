@@ -14,6 +14,21 @@ Logs do not get blanket Coverage records the way a database or JSON
 snapshot does: a log is a stream of individual events, not a dump of a
 whole collection, so it can only prove the state of the exact
 resource_id a line mentions, which a plain Observation already covers.
+(Decided in Phase 2's open questions, confirmed in Phase 2b: a log
+proves only the exact resource it names.)
+
+Phase 2b addition: a line can carry an identifier of the person
+(lookup_key, subject_ref/subject_key, correlation_key, or an email
+under any key) without yet having a resolved resource_id (e.g. a
+"profile_lookup_started" line), while a later line of the same
+trace_id has the resource_id but no identifier of its own (the
+matching "_completed" line). Every such identifier is collected into a
+TraceHint, keyed by trace_id, regardless of whether its own line has a
+resource_id. The only other trace-like key found in this dataset is
+`requestId` (cloud_runtime_export family); profiling showed it is
+unique per line there, never reused across lines the way trace_id is,
+so it is not treated as a correlation key. `correlation_id` does not
+appear anywhere in the data.
 """
 
 import json
@@ -26,11 +41,11 @@ if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
     from audit import mapping
     from audit.loaders import EvidenceFile
-    from audit.models import Observation
+    from audit.models import Observation, TraceHint
 else:
     from .. import mapping
     from ..loaders import EvidenceFile
-    from ..models import Observation
+    from ..models import Observation, TraceHint
 
 #: The 10 real log-file families, by filename stem. This is the
 #: canonical definition; code/tools/profile_dataset.py imports
@@ -180,11 +195,30 @@ _IDENTIFIER_LIKE_KEYS = {
     "match_key",
     "subject_reference",
     "subject_ref",
+    "subject_key",
     "customer_email",
     "requester_email",
     "email",
 }
 _EMAIL_SHAPE_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+_USER_ID_SHAPE_RE = re.compile(r"^user_\d+$")
+
+
+def _identifier_values(fields: dict) -> list[tuple[str, str]]:
+    """Every (kind, value) identifier found in a parsed line's fields.
+    kind is 'email' or 'user_id'; used both for a resource-bearing
+    line's own link_keys and for trace-hint extraction on lines with no
+    resource_id of their own."""
+    found = []
+    for key, value in fields.items():
+        if key == "resource_id" or not isinstance(value, str):
+            continue
+        if key in _IDENTIFIER_LIKE_KEYS or _EMAIL_SHAPE_RE.match(value):
+            if _USER_ID_SHAPE_RE.match(value):
+                found.append(("user_id", value))
+            else:
+                found.append(("email", value.strip().lower()))
+    return found
 
 
 def _fields_to_observation(
@@ -196,14 +230,16 @@ def _fields_to_observation(
 
     identifiers: set[str] = set()
     link_keys: set[str] = {resource_id}
+    identifier_keys = {key for key, value in fields.items() if key in _IDENTIFIER_LIKE_KEYS}
+    for kind, value in _identifier_values(fields):
+        identifiers.add("email" if kind == "email" else "other")
+        link_keys.add(value)
     attrs: dict = {}
     for key, value in fields.items():
-        if key in ("resource_id",):
+        if key in ("resource_id",) or key in identifier_keys:
             continue
-        if key in _IDENTIFIER_LIKE_KEYS or (isinstance(value, str) and _EMAIL_SHAPE_RE.match(value)):
-            identifiers.add("email")
-            link_keys.add(value.strip().lower())
-            continue
+        if isinstance(value, str) and (_EMAIL_SHAPE_RE.match(value) or _USER_ID_SHAPE_RE.match(value)):
+            continue  # already captured above via _identifier_values' value-shape match
         attrs[key] = value
 
     entry = mapping.mapping_for_resource_id(resource_id)
@@ -234,11 +270,21 @@ def _fields_to_observation(
     )
 
 
-def parse_log_file(ev: EvidenceFile, resolved_path: Path) -> tuple[list[Observation], int]:
-    """Returns (observations, unparsed_line_count)."""
+def parse_log_file(ev: EvidenceFile, resolved_path: Path) -> tuple[list[Observation], int, list[TraceHint]]:
+    """Returns (observations, unparsed_line_count, trace_hints).
+
+    trace_hints are built from EVERY line that carries a trace_id and an
+    identifier-like value, whether or not that line also has a
+    resource_id of its own (a "profile_lookup_started" line has the
+    identifier but not yet a resolved resource; the matching
+    "_completed" line later in the same trace has the resource_id but
+    often no identifier of its own -- see
+    code/audit/linker.py's trace_correlation rule, which is the only
+    consumer of these hints)."""
     family = family_for_filename(Path(ev.file_path).name)
     parser = _FAMILY_PARSERS.get(family)
     observations: list[Observation] = []
+    trace_hints: list[TraceHint] = []
     unparsed = 0
 
     for line in resolved_path.read_text(encoding="utf-8").splitlines():
@@ -254,8 +300,14 @@ def parse_log_file(ev: EvidenceFile, resolved_path: Path) -> tuple[list[Observat
             unparsed += 1
             continue
         event_time = _parse_ts(ts_text)
+
+        trace_id = fields.get("trace_id")
+        if trace_id:
+            for _kind, value in _identifier_values(fields):
+                trace_hints.append(TraceHint(trace_id=trace_id, value=value, event_time=event_time, source_id=ev.file_id))
+
         obs = _fields_to_observation(fields, event_time, ev.file_id, ev.captured_at)
         if obs is not None:
             observations.append(obs)
 
-    return observations, unparsed
+    return observations, unparsed, trace_hints
