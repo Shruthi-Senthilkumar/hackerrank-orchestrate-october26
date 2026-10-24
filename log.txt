@@ -446,3 +446,25 @@ repo_root=/home/claude/hackerrank-orchestrate-october26
 worktree=main
 parent_agent=none
 
+## 2026-10-24T16:41:42Z Why Flash-Lite over OCR as primary reader
+
+User Prompt (verbatim, secrets redacted):
+why did you swap flash instead of rapidocr or paddle ocr?
+
+Agent Response Summary:
+Explained that the Flash to Flash-Lite swap was driven only by Flash's daily request quota, and that OCR-as-primary was never tested. Viewed three of the 11 evidence screenshots (backup, connector and search consoles) and found clean, templated console UIs whose facts are row-level (resource ID, email, user reference, state words), which a deterministic OCR plus row-geometry parser can read. Recommended flipping to OCR as the primary reader with Flash-Lite as the independent second reader, pending the user's approval. No decision recorded yet.
+
+Actions:
+* cmd: git fetch -> no new remote commits
+* Read: three dataset evidence images (backup_restore_console, connector_management_console, search_index_inspector); no repo files changed except log.txt
+* cmd: listed sizes of the 11 PNG and 4 PDF evidence files; pymupdf is not installed in this workspace, so PDF text layers were not checked (Phase 1 profile does that)
+* cmd: appended this entry, ran log_tools.py check, committed and pushed log.txt to the fork
+
+Context:
+tool=Claude Code
+model=claude-sonnet-5-5
+branch=main
+repo_root=/home/claude/hackerrank-orchestrate-october26
+worktree=main
+parent_agent=none
+
