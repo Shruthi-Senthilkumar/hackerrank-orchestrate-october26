@@ -926,3 +926,25 @@ repo_root=C:\Users\shrut\hackerrank-orchestrate-october26
 worktree=main
 parent_agent=none
 
+
+## [2026-10-24T18:26:20Z] Phase 2b review passed, D17 recorded, Phase 3 released
+
+User Prompt (verbatim, secrets redacted):
+(Attached the tail of the Phase 2b terminal report: trace correlation implemented, recall 0.604 to 0.676 (67/111 to 75/111), 12 unexplained pairs, the case_17 extra link explained as genuine, and a note that evidence_58 is needed by case_07.)
+
+Agent Response Summary:
+Pulled commit d14e5af, ran the tests (97 pass), the log check (OK) and read phase2b_report.md. Independently tested three more candidate links for the 12 unexplained pairs: file-level identity in the export (none), positional alignment across export collections (none), and a reported_at-anchored activity window restricted to identity-less records (17 correct, 83 wrong). Concluded they are unattributable and recorded D17. Wrote the Phase 3 prompt, with a same-document PDF linking carry-over for evidence_58.
+
+Actions:
+* cmd: git pull; pytest code/tests -q -> 97 passed; log_tools.py check -> OK
+* cmd: ad hoc checks of the service_resource_export structure, per-case activity rows, and the window rule precision
+* edited: claude_terminal/DECISIONS.md (D17), claude_terminal/README.md
+* wrote: claude_terminal/phases/phase_3.md
+
+Context:
+tool=Claude Code
+model=claude-sonnet-5-5
+branch=main
+repo_root=/home/claude/hackerrank-orchestrate-october26
+worktree=main
+parent_agent=none

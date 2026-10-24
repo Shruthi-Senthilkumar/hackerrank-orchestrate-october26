@@ -19,8 +19,8 @@ It is not part of the submission: `code.zip` contains only `README.md` and `code
 | 0 | Setup | `phases/phase_0.md` | Done, passed with 3 carry-overs (folded into Phase 1 task 0) |
 | 1 | Safe data foundation | `phases/phase_1.md` | Done. Reviewed and passed (61/61 tests also pass on Linux). |
 | 2 | Identity and evidence | `phases/phase_2.md` | Built; review found a linker recall gap, fix-up phase 2b released |
-| 2b | Linker recall fix-up | `phases/phase_2b.md` | Released |
-| 3 | Rules-only baseline | not released | Locked |
+| 2b | Linker recall fix-up | `phases/phase_2b.md` | Done. Reviewed and passed (97 tests). 12 unattributable pairs accepted as D17. |
+| 3 | Rules-only baseline | `phases/phase_3.md` | Released |
 | 4 | Guarded AI layer | not released | Locked |
 | 5 | Test and harden | not released | Locked |
 | 6 | Ship | not released | Locked |
