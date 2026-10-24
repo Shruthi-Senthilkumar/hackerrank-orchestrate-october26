@@ -509,3 +509,95 @@ repo_root=C:\Users\shrut\hackerrank-orchestrate-october26
 worktree=main
 parent_agent=none
 
+## 2026-10-24T17:05:23Z PHASE 1 complete: safe data foundation, sandbox, profile report
+
+User Prompt (verbatim, secrets redacted):
+[Phase 1 kickoff prompt from claude_terminal/phases/phase_1.md, pasted verbatim: build PRD Phase 1 only
+(F01 paths/loaders, F02 timeview gateway, S3 SQL sandbox, profile_report.md, mapping.py, tests, quality
+gates); carry-over task 0 (drop INTENT_MODEL_FALLBACK, remove rapidfuzz, add code/prompts/.gitkeep, write
+and run code/tests/probe_capabilities.py); confirmed Groq/Gemini console limits to bake into config.py;
+asked to measure manifest-vs-internal timestamp agreement on all 94 evidence files as a [CALIBRATE]
+question rather than deciding it; asked for the empirically-derived minimal SQL sandbox allowlist.]
+
+Agent Response Summary:
+Completed carry-over task 0: removed INTENT_MODEL_FALLBACK from config.py (decision D10, no second Groq
+model), swapped EXTRACT_MODEL to gemini-3.1-flash-lite as primary with gemini-3.8-flash as
+EXTRACT_MODEL_RARE (D2/D9/D11), filled in the four Groq rate numbers and the two Gemini per-day budgets
+from the console-limits block, removed rapidfuzz from requirements.txt and the venv, added
+code/prompts/.gitkeep, and ran code/tests/probe_capabilities.py once: both probes answered yes (Groq
+qwen/qwen3.8-27b accepts a strict JSON schema with reasoning_effort="none"; Gemini gemini-3.1-flash-lite
+accepts a response schema with a small local image), so nothing required stopping.
+Built F01 (code/audit/paths.py, containment-checked path resolution), F02 (code/audit/timeview.py, the
+single TimeView(audit_at) gateway with an inclusive is_visible boundary), and S3
+(code/audit/evidence/sql_sandbox.py): derived the SQL authorizer allowlist empirically by loading all 24
+real snapshots under a logging authorizer first, rather than guessing. All 24 real files load; 8 hostile
+inputs (ATTACH, a writable PRAGMA, CREATE TRIGGER, load_extension, CREATE VIEW, a recursive CTE, an
+oversized statement count, a denied function) are rejected safely at load, and UPDATE/DELETE/DROP/ATTACH
+are also denied at query time on an already-loaded connection.
+Wrote code/tools/profile_dataset.py and ran it to profile every evidence file and every
+system_activity.csv resource_id prefix, then wrote code/evaluation/profile_report.md and
+code/audit/mapping.py from its output. Resolved 5 previously-unproven PRD prefixes from activity rows and
+evidence content: legal_hold_ -> legal_service -> LEGAL_HOLD_RECORD, email_delivery_ -> email_delivery_
+service -> EMAIL_DELIVERY_LOG, cache_ -> cache_service -> CACHE_ENTRY (activity-only, no file evidence),
+marketing_ -> marketing_platform -> MARKETING_PROFILE, object_ -> object_storage -> SUPPORT_ATTACHMENT
+(distinct from support_platform's own ticket_attachments). Left SECONDARY_IDENTIFIER and
+PRODUCT_TELEMETRY out of mapping.py as genuinely unresolved (no prefix, system_id, or evidence record
+found for either; flagged for the user rather than guessed).
+Measured the [CALIBRATE] manifest-vs-internal-timestamp question on all 94 files: SQL (24/24), non-bundle
+JSON (16/16), the one text record, and the 26 logs (bounds check) all agree exactly. The 12
+customer_data_snapshot_bundle_*.json files are the only disagreement: the bundle's own exported_at always
+equals the manifest, but each nested snapshot inside it carries its own earlier captured_at. Recommended
+(not decided) that Phase 2's JSON parser use the per-snapshot timestamp, and flagged this for the user's
+confirmation before Phase 2 starts.
+Added lru_cache to the three loaders TimeView reads on every construction, since the real pipeline will
+build one TimeView per case (550 times) and re-parsing system_activity.csv from scratch each time would be
+wasteful. Wrote 61 pytest tests (60 passed, 1 skipped: a symlink-escape test that needs privilege this
+Windows session does not have) covering the time-rule inclusive boundary and a full sweep over all 550
+request rows proving no evidence after audit_at is ever visible, path containment (parent traversal,
+absolute path, drive letter, backslash, nonexistent file, symlink escape), a static-analysis gateway-rule
+test (no code/audit module outside loaders.py/timeview.py references the raw activity/audit-log/manifest
+tables or calls their loader functions), all 24 real SQL snapshots loading, and the 8 hostile SQL inputs
+plus query-time mutation attempts being rejected. Two gateway-rule test failures were false positives from
+docstring prose repeating the guarded filenames in English, not actual file access; reworded the prose in
+mapping.py/paths.py/timeview.py instead of weakening the test.
+
+Actions:
+* cmd: git pull --rebase -> already up to date
+* edited: code/config.py (removed INTENT_MODEL_FALLBACK; EXTRACT_MODEL=gemini-3.1-flash-lite,
+  EXTRACT_MODEL_RARE=gemini-3.8-flash; filled in GROQ_* limits and
+  GEMINI_FLASH_LITE_REQUESTS_PER_DAY=500 / GEMINI_FLASH_REQUESTS_PER_DAY=20)
+* edited: code/requirements.txt (removed rapidfuzz)
+* cmd: pip uninstall rapidfuzz -> removed from .venv
+* wrote: code/prompts/.gitkeep
+* wrote: code/tests/probe_capabilities.py -> ran once: groq_json_schema_accepted=yes,
+  groq_thinking_off_accepted=yes, groq_valid_object_produced=yes (17 in / 2 out tokens);
+  gemini_schema_with_image_accepted=yes (prompt_tokens=1103, candidates_tokens=6)
+* wrote: code/audit/paths.py, code/audit/loaders.py, code/audit/timeview.py,
+  code/audit/evidence/sql_sandbox.py, code/audit/mapping.py
+* cmd: loaded all 24 real .sql files under a logging authorizer -> derived the minimal allowlist
+  (CREATE_TABLE, CREATE_INDEX, INSERT, PRAGMA[foreign_keys], TRANSACTION, READ, REINDEX,
+  FUNCTION[json_valid], UPDATE[sqlite_master only]); no ATTACH/DETACH/TRIGGER/VIEW/VTABLE/
+  load_extension/RECURSIVE ever requested by real evidence
+* wrote: code/tools/profile_dataset.py -> ran once over all 94 evidence files + system_activity.csv
+* wrote: code/evaluation/profile_report.md
+* cmd: measured manifest vs internal captured_at on all 94 files -> 82 exact agreements + 12
+  customer_data_snapshot_bundle_*.json files where per-snapshot captured_at differs from (and
+  predates) the bundle's own exported_at/manifest value; flagged as [CALIBRATE], not decided
+* edited: code/audit/loaders.py (lru_cache on load_system_activity/load_user_audit_log/
+  load_evidence_files for TimeView performance)
+* wrote: code/tests/test_paths.py, test_timeview.py, test_gateway_rule.py, test_sql_sandbox.py,
+  test_loaders.py
+* cmd: pytest code/tests -q -> 2 failed (gateway-rule false positives) -> edited docstrings in
+  mapping.py/paths.py/timeview.py -> pytest code/tests -q -> 60 passed, 1 skipped
+* cmd: python code/main.py --no-ai -> prints plan, exit 0
+* cmd: git diff --cached | grep -E 'gsk_|AIza|sk-|api_key=' -> only safe os.environ[...] reads, no secrets
+* cmd: appended this entry, ran log_tools.py check, committed and pushed to the fork
+
+Context:
+tool=Claude Code
+model=claude-sonnet-5
+branch=main
+repo_root=C:\Users\shrut\hackerrank-orchestrate-october26
+worktree=main
+parent_agent=none
+
