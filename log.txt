@@ -383,3 +383,65 @@ repo_root=/home/claude/hackerrank-orchestrate-october26
 worktree=main
 parent_agent=none
 
+## 2026-10-24T16:35:50Z Look up model rate limits (logged late)
+
+User Prompt (verbatim, secrets redacted):
+find model limits urself by refering to the websites
+
+Agent Response Summary:
+Looked up rate limits from the providers' documentation. Groq's official page lists 30 RPM, 1K RPD, 8K TPM and 200K TPD for qwen/qwen3.8-27b. Google no longer publishes Gemini free-tier numbers on its docs page; a Google AI forum thread and a third-party tracker agree on about 20 requests/day for gemini-3.8-flash and about 500/day for gemini-3.1-flash-lite, which are unofficial. Put the figures into the Phase 1 prompt and added decision D9. Pushed only the docs, not log.txt, because the terminal might have been mid-phase.
+
+Actions:
+* tool: WebSearch x3 (Groq limits, Gemini limits, Flash-Lite limits)
+* tool: WebFetch console.groq.com/docs/rate-limits, ai.google.dev rate-limits page, a Google AI forum thread, pricepertoken Google AI Studio free page
+* edited: claude_terminal/phases/phase_1.md (CONSOLE LIMITS block), claude_terminal/DECISIONS.md (D9)
+* cmd: git commit and push docs only -> abe2e09
+
+Context:
+tool=Claude Code
+model=claude-sonnet-5-5
+branch=main
+repo_root=/home/claude/hackerrank-orchestrate-october26
+worktree=main
+parent_agent=none
+
+## 2026-10-24T16:35:50Z List stack changes (logged late)
+
+User Prompt (verbatim, secrets redacted):
+I didnt give any prompts after phase 0. now list out the changes we need to make in the stack. in breif
+
+Agent Response Summary:
+Confirmed that only the Phase 0 prompt had been pasted into the terminal, so editing the Phase 1 prompt was safe. Listed 12 stack changes: some already decided, nine to approve (intent safeguards, Flash-Lite as primary reader with OCR grounding, per-day request budgets and timeouts, thinking-token accounting, RapidOCR default, dropping rapidfuzz, packager tool). Asked whether to mark them approved.
+
+Actions:
+* no repo files changed
+
+Context:
+tool=Claude Code
+model=claude-sonnet-5-5
+branch=main
+repo_root=/home/claude/hackerrank-orchestrate-october26
+worktree=main
+parent_agent=none
+
+## 2026-10-24T16:35:50Z Approve stack changes, drop gpt-oss, ready Phase 1
+
+User Prompt (verbatim, secrets redacted):
+skip the gpt-oss-20b alone. proceed with the rest. lets make these changes and proceed to phase 1
+
+Agent Response Summary:
+Removed the gpt-oss-20b fallback everywhere and recorded the approved changes as decisions D10-D14 (intent rules plus Qwen with no second model, Flash-Lite primary reader with OCR grounding, RapidOCR default, rapidfuzz dropped). Updated the Phase 1 prompt so the terminal deletes INTENT_MODEL_FALLBACK, removes rapidfuzz and is told which models it may use. Confirmed the fork had no new remote commits before pushing, and wrote the three late log entries.
+
+Actions:
+* cmd: git fetch -> no new commits on origin/main
+* edited: claude_terminal/phases/phase_1.md (task 0a, PROJECT RULES model list), claude_terminal/DECISIONS.md (D1, D3, D6, D9 statuses; new D10-D14)
+* cmd: appended three log entries, ran log_tools.py check, committed and pushed to the fork
+
+Context:
+tool=Claude Code
+model=claude-sonnet-5-5
+branch=main
+repo_root=/home/claude/hackerrank-orchestrate-october26
+worktree=main
+parent_agent=none
+

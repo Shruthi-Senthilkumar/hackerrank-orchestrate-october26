@@ -20,7 +20,7 @@ LOGGING (mandatory every turn): follow AGENTS.md section 5 and claude_terminal/L
 
 SCOPE: PRD Phase 1 ONLY, plus the carry-over items below. No identity resolution, linking, policy, detectors, planner or model calls. Do not start Phase 2.
 
-PROJECT RULES: never hardcode case, evidence, user or resource IDs in logic or prompts; use only files under dataset/; use only information available at or before each case's audit_at; models only extract facts and code decides; keys only from environment variables; deterministic output. Ask me before deciding anything the PRD marks [CALIBRATE] or [VERIFY] when the data does not answer it.
+PROJECT RULES: use only these models: Groq qwen/qwen3.8-27b for intent; Gemini gemini-3.1-flash-lite (primary reader) and gemini-3.8-flash (rare, budgeted) for images and PDFs; never any openai/gpt-oss model. Never hardcode case, evidence, user or resource IDs in logic or prompts; use only files under dataset/; use only information available at or before each case's audit_at; models only extract facts and code decides; keys only from environment variables; deterministic output. Ask me before deciding anything the PRD marks [CALIBRATE] or [VERIFY] when the data does not answer it.
 
 CONSOLE LIMITS (looked up by my reviewer on 2026-10-24; I will confirm the unconfirmed ones in the consoles)
 - Groq qwen/qwen3.8-27b, from Groq's official rate-limits docs: 30 requests/min, 1,000 requests/day, 8,000 tokens/min, 200,000 tokens/day. Limits apply per organization; the docs table does not say which plan it describes, so treat as documented, not console-confirmed.
@@ -37,7 +37,7 @@ So the PRD's blanket "deny PRAGMA" would reject real evidence. The sandbox must 
 
 TASKS
 0. Carry-over from Phase 0
-   a. code/config.py docstring says all four model IDs were smoke-tested. Only three were called (qwen3.8-27b, gemini-3.8-flash, and gemini-3.1-flash-lite ad hoc); openai/gpt-oss-20b was only seen in the model list. Correct the docstring to say exactly that.
+   a. In code/config.py: delete INTENT_MODEL_FALLBACK completely (decision D10: I rejected openai/gpt-oss-20b; no second Groq model is used anywhere in this project). Fix the docstring so it says exactly which model IDs were actually called: qwen/qwen3.8-27b, gemini-3.8-flash, and gemini-3.1-flash-lite (ad hoc). Remove rapidfuzz from code/requirements.txt and from the venv (decision D13; add it back only if some phase really uses it).
    b. Add .gitkeep to code/prompts/ so the folder exists in a clone.
    c. Write code/tests/probe_capabilities.py (script, not pytest) that prints only yes/no and token counts: (1) does Groq qwen/qwen3.8-27b accept a strict JSON-schema response format and can thinking be turned off, producing a valid object; (2) does gemini-3.1-flash-lite accept a response schema with an image or PDF-sized input of a few KB generated locally. Use a hard per-call timeout of 90 seconds and at most one retry. For Gemini also print thoughts_token_count and total_token_count, because gemini-3.8-flash returned output_tokens=None and the usage ledger must count thinking tokens. Run it once and report. If an answer is "no", stop and tell me.
 1. code/audit/paths.py (F01): repo-root-relative paths; `resolve_evidence(rel_path)` that returns a path only if, after resolving, it is inside dataset/evidence/. Reject "..", absolute paths, Windows drive letters and backslash tricks, and symlink escapes.
