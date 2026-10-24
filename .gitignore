@@ -1,0 +1,18 @@
+# secrets: keys live only in .env on your own machine
+.env
+.env.*
+!.env.example
+
+# environments, caches, build output
+.venv/
+venv/
+.cache/
+__pycache__/
+*.pyc
+.pytest_cache/
+.DS_Store
+
+# submission artifacts are built locally, never committed
+code.zip
+agent-trace/
+agent-trace.zip
