@@ -8,6 +8,7 @@ It is not part of the submission: `code.zip` contains only `README.md` and `code
 | `SETUP.md` | One-time terminal setup, keys, environment, how to run a phase |
 | `LOGGING.md` | How the terminal keeps `log.txt` valid and includes terminal activity |
 | `SUBMISSION.md` | The three files to upload, the canonical folder tree, what goes in `code.zip`, preflight checks, and what to settle before submitting |
+| `DECISIONS.md` | Every deviation from the PRD and every settled `[CALIBRATE]`/`[VERIFY]` item, with the reason (interview source) |
 | `log_tools.py` | `python claude_terminal/log_tools.py check` validates `log.txt` and scans it for secrets |
 | `phases/phase_N.md` | The prompt for each phase, released one at a time |
 
@@ -15,8 +16,8 @@ It is not part of the submission: `code.zip` contains only `README.md` and `code
 
 | Phase | PRD name | Prompt | Status |
 |---|---|---|---|
-| 0 | Setup | `phases/phase_0.md` | Released |
-| 1 | Safe data foundation | not released | Locked until Phase 0 is complete and its issues are resolved |
+| 0 | Setup | `phases/phase_0.md` | Done, passed with 3 carry-overs (folded into Phase 1 task 0) |
+| 1 | Safe data foundation | `phases/phase_1.md` | Released |
 | 2 | Identity and evidence | not released | Locked |
 | 3 | Rules-only baseline | not released | Locked |
 | 4 | Guarded AI layer | not released | Locked |
