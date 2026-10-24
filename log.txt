@@ -643,3 +643,44 @@ branch=main
 repo_root=/home/claude/hackerrank-orchestrate-october26
 worktree=main
 parent_agent=none
+## [2026-10-24T17:31:41Z] Pull Phase 2 prompt; fix EMAIL_DELIVERY_LOG mis-citation
+
+User Prompt (verbatim, secrets redacted):
+git pull --rebase
+
+Agent Response Summary:
+Pulled and fast-forwarded 993805c..b6a65bc: the web-chat review session recorded decisions D15 (two
+clocks for JSON bundles: manifest captured_at gates visibility/citation, per-snapshot captured_at only
+decides recency among already-visible evidence) and D16 (SECONDARY_IDENTIFIER and PRODUCT_TELEMETRY are
+genuinely absent; CACHE_ENTRY and EMAIL_DELIVERY_LOG exist only as activity claims, re-checked after
+Phase 4 images), added claude_terminal/phases/phase_2.md, and patched log_tools.py to accept the
+bracketed timestamp header AGENTS.md 5.2 actually specifies (my Phase 0/1 entries used an unbracketed
+header; switching to the bracketed form from this entry on).
+While reconciling D16 against my own Phase 1 artifacts, found and fixed a real mistake: code/audit/
+mapping.py and code/evaluation/profile_report.md both cited the notification_delivery log family as
+evidence for EMAIL_DELIVERY_LOG. That log is actually account_service USER_PROFILE lookups via
+downstream_delivery_service, not email_delivery_ resources -- a naming-similarity conflation, not real
+evidence. No evidence file anywhere contains an email_delivery_NNNN resource_id. Corrected both files to
+match D16's (correct) assessment: EMAIL_DELIVERY_LOG's prefix/system_id are confirmed via the activity
+stream only, with no file-backed evidence, same situation as CACHE_ENTRY. Did not start Phase 2 (its
+task 0a will fix the log-family grouping bug the reviewer separately flagged); reran the full test suite
+to confirm the correction changed no behavior.
+
+Actions:
+* cmd: git pull --rebase -> fast-forward 993805c..b6a65bc (DECISIONS.md D15/D16, log_tools.py bracket
+  support, claude_terminal/phases/phase_2.md, log.txt)
+* cmd: grep evidence/ for email_delivery_[0-9] and cache_[0-9] -> no matches in any evidence file,
+  confirming D16
+* edited: code/audit/mapping.py (EMAIL_DELIVERY_LOG note corrected, references D16)
+* edited: code/evaluation/profile_report.md (section 7 EMAIL_DELIVERY_LOG row corrected)
+* cmd: pytest code/tests -q -> 60 passed, 1 skipped (unchanged)
+* cmd: appended this entry (bracketed header), ran log_tools.py check, committed and pushed to the fork
+
+Context:
+tool=Claude Code
+model=claude-sonnet-5
+branch=main
+repo_root=C:\Users\shrut\hackerrank-orchestrate-october26
+worktree=main
+parent_agent=none
+

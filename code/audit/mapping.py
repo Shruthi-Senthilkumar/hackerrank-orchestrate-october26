@@ -53,7 +53,11 @@ MAPPINGS: list[CategoryMapping] = [
         "email_delivery_",
         "email_delivery_service",
         "EMAIL_DELIVERY_LOG",
-        "confirmed via the activity stream (email_delivery_service / notification_service).",
+        "prefix/system confirmed only via the activity stream (email_delivery_service / "
+        "notification_service); no evidence file contains an email_delivery_NNNN resource_id. "
+        "(Correction: an earlier version of this note wrongly cited the notification_delivery "
+        "log family, which is account_service USER_PROFILE lookups, not email-delivery records. "
+        "See DECISIONS.md D16; re-checked once images are read in Phase 4.)",
     ),
     CategoryMapping(
         "cache_",
