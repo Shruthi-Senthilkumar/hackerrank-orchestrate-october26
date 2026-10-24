@@ -166,6 +166,8 @@ Actions:
 * wrote: claude_terminal/SUBMISSION.md
 * edited: .gitignore (added submission/), claude_terminal/phases/phase_0.md, claude_terminal/README.md
 * cmd: appended this entry, ran log_tools.py check, committed and pushed to the fork
+* cmd: git pull --rebase after the push was rejected (fork was 2 commits ahead: organizers' AGENTS.md link fix merged into the fork); rebased cleanly
+* edited: claude_terminal/SUBMISSION.md (replaced the outdated 'four w' note with the corrected submission URL)
 
 Context:
 tool=Claude Code
