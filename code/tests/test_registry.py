@@ -16,7 +16,11 @@ def test_every_evidence_file_is_parsed_or_explicitly_deferred():
     assert reg.errors == []
     image_rows = [r for r in reg.parse_table if r["format"] == "image"]
     assert len(image_rows) == 11
-    assert all(r["observations"] == 0 for r in image_rows)  # deferred to Phase 4, not guessed
+    # Phase 4: images are read (OCR grounding + two Gemini readers, see
+    # code/audit/evidence/image_reader.py). Each image either yields
+    # at least one grounded, agreed fact, or is explicitly flagged in
+    # reg.errors/the per-image report -- never silently zero.
+    assert any(r["observations"] > 0 for r in image_rows)
 
 
 def test_registry_produces_a_large_nonzero_observation_and_coverage_set():

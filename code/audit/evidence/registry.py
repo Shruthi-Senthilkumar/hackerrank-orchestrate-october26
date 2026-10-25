@@ -22,13 +22,13 @@ from pathlib import Path
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
     from audit import loaders, paths
-    from audit.evidence import json_parser, log_parser, pdf_parser, sql_parser, text_parser
+    from audit.evidence import image_reader, json_parser, log_parser, pdf_parser, sql_parser, text_parser
     from audit.evidence.sql_sandbox import SqlSandboxError
     from audit.models import Coverage, DocumentHint, Observation, TraceHint
     from audit.timeview import TimeView
 else:
     from .. import loaders, paths
-    from . import json_parser, log_parser, pdf_parser, sql_parser, text_parser
+    from . import image_reader, json_parser, log_parser, pdf_parser, sql_parser, text_parser
     from .sql_sandbox import SqlSandboxError
     from ..models import Coverage, DocumentHint, Observation, TraceHint
     from ..timeview import TimeView
@@ -59,8 +59,12 @@ def _format_for_path(file_path: str) -> str:
 
 def _parse_one(
     ev: loaders.EvidenceFile,
+    ai_enabled: bool = True,
+    image_reports: list = None,
 ) -> tuple[list[Observation], list[Coverage], list[TraceHint], list[DocumentHint], int, str]:
-    """Returns (observations, coverage, trace_hints, document_hints, unparsed_count, format)."""
+    """Returns (observations, coverage, trace_hints, document_hints, unparsed_count, format).
+    `image_reports`, if given, collects one ImageReadReport per image
+    (Phase 4 F05's per-image report), appended as a side effect."""
     fmt = _format_for_path(ev.file_path)
     resolved = paths.resolve_evidence(ev.file_path)
 
@@ -80,8 +84,14 @@ def _parse_one(
         obs, _info, doc_hints = pdf_parser.parse_pdf_file(ev, resolved)
         return obs, [], [], doc_hints, 0, fmt
     if fmt == "image":
-        # Images are not read in Phase 2; deferred to Phase 4's vision model.
-        return [], [], [], [], 0, fmt
+        image_bytes = resolved.read_bytes()
+        agreed, report = image_reader.read_image(ev.file_id, image_bytes, "image/png", ai_enabled)
+        if image_reports is not None:
+            image_reports.append(report)
+        if agreed is None:
+            return [], [], [], [], 0, fmt
+        obs, doc_hints = image_reader.facts_to_observations(ev.file_id, agreed, ev.captured_at)
+        return obs, [], [], doc_hints, 0, fmt
 
     raise RegistryError(f"no parser dispatch for format {fmt!r} ({ev.file_path})")  # pragma: no cover
 
@@ -156,7 +166,7 @@ def _document_hint_from_dict(d: dict) -> DocumentHint:
     )
 
 
-def _cache_key() -> str:
+def _cache_key(ai_enabled: bool = True) -> str:
     h = hashlib.sha256()
     for ev in sorted(loaders.load_evidence_files(), key=lambda e: e.file_id):
         h.update(ev.file_id.encode("utf-8"))
@@ -166,6 +176,16 @@ def _cache_key() -> str:
             h.update(b"MISSING")
     for mod_path in sorted(Path(__file__).parent.glob("*.py")):
         h.update(mod_path.read_bytes())
+    # Phase 4: ai_enabled must be part of the key, never just a runtime
+    # flag -- otherwise a cold `--no-ai` run (images read as empty,
+    # since nothing is cached yet) would permanently poison the SAME
+    # cache entry a later live run would also match, and the live run
+    # would never actually read the images. A later --no-ai run after
+    # a live one still costs nothing extra on the network: it builds
+    # its own registry cache entry, but code/audit/llm/client.py's own
+    # cache (keyed by image bytes + model + prompt version, not by
+    # ai_enabled) already has the real results from the live run.
+    h.update(b"ai_enabled=1" if ai_enabled else b"ai_enabled=0")
     return h.hexdigest()
 
 
@@ -203,8 +223,12 @@ class RegistryResult:
         return out
 
 
-def build_registry(use_cache: bool = True) -> RegistryResult:
-    cache_key = _cache_key()
+def build_registry(use_cache: bool = True, ai_enabled: bool = True, image_reports: list = None) -> RegistryResult:
+    """`image_reports`, if given, is appended with one
+    image_reader.ImageReadReport per image file -- only populated on a
+    cache MISS (a fresh parse); a cache hit means the images were
+    already read in a prior run, so there is nothing new to report."""
+    cache_key = _cache_key(ai_enabled)
     if use_cache and CACHE_PATH.exists():
         try:
             cached = json.loads(CACHE_PATH.read_text(encoding="utf-8"))
@@ -227,7 +251,7 @@ def build_registry(use_cache: bool = True) -> RegistryResult:
     result = RegistryResult()
     for ev in sorted(loaders.load_evidence_files(), key=lambda e: e.file_id):
         try:
-            obs, cov, hints, doc_hints, unparsed, fmt = _parse_one(ev)
+            obs, cov, hints, doc_hints, unparsed, fmt = _parse_one(ev, ai_enabled, image_reports)
         except (RegistryError, SqlSandboxError, ValueError, json.JSONDecodeError) as e:
             result.errors.append({"file_id": ev.file_id, "file_path": ev.file_path, "error": str(e)})
             result.parse_table.append(

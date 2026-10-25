@@ -27,6 +27,8 @@ def trace_to_dict(result: CaseResult) -> dict:
     return {
         "case_id": t.case_id,
         "status": t.status,
+        "intent_result": t.intent_result,
+        "classify_request_corroboration": t.classify_request_corroboration,
         "reported_status_claim": t.reported_status_claim,
         "reported_at_claim": t.reported_at_claim,
         "identity_resolution": t.identity_resolution,

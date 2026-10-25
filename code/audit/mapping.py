@@ -101,6 +101,13 @@ def mapping_for_resource_id(resource_id: str) -> CategoryMapping | None:
     return next(m for m in MAPPINGS if m.prefix == prefix)
 
 
+def all_system_ids() -> list[str]:
+    """Every system_id this mapping table knows about -- the enum used
+    by code/audit/llm/schemas.py's vision_schema() (Phase 4 F05), built
+    from this data-driven table rather than hardcoded ahead of it."""
+    return sorted({m.system_id for m in MAPPINGS})
+
+
 #: Matches any known prefix followed by digits, e.g. "account_001",
 #: "support_4218". Used to find resource-id-shaped tokens in free text
 #: (PDF/image documents), never to invent a new prefix.

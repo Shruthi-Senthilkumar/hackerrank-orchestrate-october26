@@ -13,7 +13,9 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(REPO_ROOT / "code"))
 
-from audit import loaders  # noqa: E402
+from dotenv import load_dotenv  # noqa: E402
+
+from audit import intent, loaders  # noqa: E402
 from audit.evidence.registry import build_registry  # noqa: E402
 from audit.case_runner import run_case  # noqa: E402
 
@@ -26,10 +28,13 @@ def _step_tuple(step: dict, with_evidence: bool) -> tuple:
     return tuple(step[f] for f in STEP_FIELDS)
 
 
-def score() -> dict:
-    reg = build_registry()
+def score(ai_enabled: bool = True) -> dict:
+    reg = build_registry(ai_enabled=ai_enabled)
     samples = loaders.load_sample_deletion_requests()
     outputs = {r.case_id: r for r in loaders.load_sample_output()}
+
+    intent_results = intent.classify_all(samples, ai_enabled)
+    intent_not_delete = [r.case_id for r in samples if intent_results[r.case_id].final_intent != "DELETE"]
 
     status_correct = 0
     total_expected = total_matched = total_got = 0
@@ -40,7 +45,7 @@ def score() -> dict:
     per_case = {}
 
     for req in samples:
-        result = run_case(req, reg)
+        result = run_case(req, reg, intent_results[req.case_id])
         expected = outputs[req.case_id]
 
         status_ok = result.status == expected.deletion_status
@@ -109,11 +114,14 @@ def score() -> dict:
         "sequence_accuracy": sequence_correct / len(samples),
         "citation_accuracy": (citation_correct / citation_total) if citation_total else 1.0,
         "per_case": per_case,
+        "intent_not_delete": intent_not_delete,
     }
 
 
 def main() -> int:
+    load_dotenv(REPO_ROOT / ".env")
     result = score()
+    print(f"intent: all 32 samples DELETE: {'PASS' if not result['intent_not_delete'] else 'FAIL ' + str(result['intent_not_delete'])}")
     print(f"samples: {result['n_samples']}")
     print(f"status accuracy: {result['status_accuracy']:.3f}")
     print(f"step precision (without evidence_id): {result['step_precision']:.3f}")

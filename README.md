@@ -100,11 +100,21 @@ This prints only `set` or `missing` per key.
 ### 4. Run the pipeline
 
 ```bash
-python code/main.py --no-ai           # rules-only baseline; writes output.csv at the repo root
+python code/main.py --no-ai           # rules/cache only; never makes a live model call
 python code/main.py --no-ai --cases case_33,case_34  # debug a subset of case ids (comma-separated)
 python code/main.py --no-ai --trace   # also writes a per-case trace under agent-trace/ (git-ignored)
-python code/main.py                   # full pipeline (AI/intent layer) -- Phase 4, not yet implemented
+python code/main.py                   # full pipeline: real intent (Groq) + image (Gemini) calls for
+                                       # anything not already cached; writes output.csv at the repo root
 ```
+
+`--no-ai` never reaches the network: a cache miss raises `AIDisabledError`
+(code/audit/llm/client.py) instead of guessing. Every model result is cached
+by content hash under `.cache/` (git-ignored), so a second run of either mode
+makes zero new calls for anything already seen. The 11 evidence images are
+read once per registry rebuild (OCR locally via RapidOCR, then two Gemini
+readers); reading all of them live can take several minutes, since the
+second reader (`gemini-3.8-flash`) is slow and rate-limited by design (D2,
+D9, D11 in `claude_terminal/DECISIONS.md`).
 
 ### 5. Run the scorer
 

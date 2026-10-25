@@ -46,5 +46,34 @@ GEMINI_FLASH_REQUESTS_PER_DAY = 20  # TODO-VERIFY in aistudio.google.com
 
 INTENT_BATCH_SIZE = 8  # TODO-VERIFY: tune once rate limits are confirmed
 MAX_TOKENS_PER_CALL = 2000  # TODO-VERIFY: hard budget guard
+MAX_TOKENS_PER_RUN = 2_000_000  # hard budget guard for one `python code/main.py` run
 
-PROMPT_VERSION = "v0"  # bumped whenever a prompt file changes
+# --- Phase 4: AI layer limits (D9, D11) ---
+LLM_CALL_TIMEOUT_S = 90  # hard per-call timeout
+LLM_RETRY_CAP = 1  # at most one retry, with exponential backoff + jitter, on 429/5xx
+
+CACHE_DIR_LLM = CACHE_DIR / "llm_cache"
+USAGE_LEDGER_PATH = CACHE_DIR / "usage_ledger.jsonl"
+GEMINI_FLASH_DAILY_BUDGET_PATH = CACHE_DIR / "gemini_flash_daily_budget.json"
+
+# --- List prices, USD per 1M tokens (for usage_report.md cost estimates only;
+# both providers are used on free tiers here, so actual incurred cost is $0) ---
+# Gemini prices: PRD 8.5. Groq qwen/qwen3.8-27b: Groq's self-serve preview
+# catalog price as of 2026-08-27 (see https://www.usagepricing.com/blueprint/activity/groq-2026-08-27-qwen-self-serve-pricing);
+# it is a preview model Groq may discontinue or re-price at short notice.
+PRICING_PER_MILLION_TOKENS = {
+    "qwen/qwen3.8-27b": {"input": 0.80, "output": 4.00},
+    "gemini-3.1-flash-lite": {"input": 0.25, "output": 1.50},
+    "gemini-3.8-flash": {"input": 0.75, "output": 3.75},
+}
+
+INTENT_PROMPT_VERSION = "v1"  # bumped whenever code/prompts/intent_v1.md changes
+# Deliberately NOT bumped for the vision_v1.md wording clarification
+# (resource_ids must match lowercase_word_digits): the actual fix for
+# the garbage-resource-id problem (e.g. "Delivery tracking") is the
+# code-level shape check in code/audit/evidence/image_reader.py's
+# ground_resource_ids(), which filters the model's ALREADY-cached raw
+# response -- it needs no new model call to take effect. Bumping this
+# would force re-reading all 11 images with the slow, budget-limited
+# second reader for no benefit.
+VISION_PROMPT_VERSION = "v1"

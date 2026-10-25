@@ -1,7 +1,13 @@
-"""Orchestrates one case end to end: identity -> linking -> state ->
-policy -> detectors -> decision -> planner. No model calls (Phase 3
-scope); intent is a deterministic placeholder that always authorizes
-deletion (real intent classification is Phase 4).
+"""Orchestrates one case end to end: intent -> identity -> linking ->
+state -> policy -> detectors -> decision -> planner.
+
+Phase 4: intent is now the real F13 classifier (code/audit/intent.py),
+computed once for the WHOLE batch of requests by the caller (Qwen
+batches several texts per call) and passed in per case as an already-
+resolved IntentResult. A NOT_APPLICABLE intent short-circuits the case
+immediately -- no identity resolution, no linking, no policy work --
+since there is nothing to audit for a request that never authorized
+deletion.
 """
 
 import sys
@@ -12,7 +18,7 @@ from typing import Optional
 
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-    from audit import decision, detectors, identity, planner, state
+    from audit import decision, detectors, identity, intent, planner, state
     from audit.evidence.registry import (
         RegistryResult,
         visible_coverage,
@@ -24,7 +30,7 @@ if __package__ in (None, ""):
     from audit.loaders import DeletionRequest
     from audit.timeview import build_time_view
 else:
-    from . import decision, detectors, identity, planner, state
+    from . import decision, detectors, identity, intent, planner, state
     from .evidence.registry import (
         RegistryResult,
         visible_coverage,
@@ -36,13 +42,12 @@ else:
     from .loaders import DeletionRequest
     from .timeview import build_time_view
 
-# Phase 3 scope: intent is always deletion. Real classification is Phase 4.
-DETERMINISTIC_INTENT_IS_DELETION = True
-
 
 @dataclass
 class CaseTrace:
     case_id: str
+    intent_result: dict = field(default_factory=dict)
+    classify_request_corroboration: list = field(default_factory=list)
     identity_resolution: dict = field(default_factory=dict)
     linked_resources: list = field(default_factory=list)  # [{resource_id, rule, system_id}]
     resource_states: list = field(default_factory=list)  # [{resource_id, exists, evidence_id, as_of}]
@@ -71,8 +76,24 @@ def _dominant_category(categories: list[Optional[str]]) -> Optional[str]:
     return Counter(non_none).most_common(1)[0][0]
 
 
-def run_case(case: DeletionRequest, registry: RegistryResult) -> CaseResult:
+def run_case(case: DeletionRequest, registry: RegistryResult, intent_result: "intent.IntentResult") -> CaseResult:
     trace = CaseTrace(case_id=case.case_id, reported_status_claim=case.reported_status)
+    trace.intent_result = {
+        "final_intent": intent_result.final_intent,
+        "rule_verdict": intent_result.rule_verdict,
+        "qwen_intent": intent_result.qwen_intent,
+        "qwen_language": intent_result.qwen_language,
+        "qwen_evidence_phrase": intent_result.qwen_evidence_phrase,
+        "escalated": intent_result.escalated,
+        "resolution": intent_result.resolution,
+        "flagged": intent_result.flagged,
+        "sanitize_flags": intent_result.sanitize_flags,
+    }
+
+    if intent_result.final_intent == "NOT_APPLICABLE":
+        trace.status = "NOT_APPLICABLE"
+        trace.fallback_reason = f"intent classified NOT_APPLICABLE via {intent_result.resolution}"
+        return CaseResult(case.case_id, "NOT_APPLICABLE", [], trace)
 
     resolution = identity.resolve_request_email(case.email, case.requested_at)
     trace.identity_resolution = {
@@ -103,6 +124,17 @@ def run_case(case: DeletionRequest, registry: RegistryResult) -> CaseResult:
     trace.linked_resources = [
         {"resource_id": rid, "rule": entries[0].rule, "system_id": entries[0].observation.system_id}
         for rid, entries in sorted(by_resource.items())
+    ]
+
+    # PRD 8.1: a CLASSIFY_REQUEST activity for one of THIS case's own
+    # already-linked resources (never a guessed resource id) is logged
+    # next to the model's intent result as corroboration only -- it is
+    # never consulted by decide_status below, and intent_result.final_
+    # intent is already settled by this point regardless of what it says.
+    trace.classify_request_corroboration = [
+        {"activity_id": a.activity_id, "resource_id": a.resource_id, "details": a.details}
+        for a in time_view.visible_activity()
+        if a.event_type == "CLASSIFY_REQUEST" and a.resource_id in by_resource
     ]
 
     visible_file_ids = {e.file_id for e in time_view.visible_evidence_files()}
@@ -159,9 +191,9 @@ def run_case(case: DeletionRequest, registry: RegistryResult) -> CaseResult:
     compliant_flow_states = [s for s in flow_states if s.exists and s.resource_id not in active_flow_ids]
     compliant_backup_states = [s for s in backup_states if s.exists and s.resource_id not in restore_risk_ids]
 
-    status = decision.decide_status(
-        resource_decisions, active_flow_findings, restore_findings, DETERMINISTIC_INTENT_IS_DELETION
-    )
+    # is_deletion_intent is always True here: a NOT_APPLICABLE intent
+    # already returned above, before any of this work began.
+    status = decision.decide_status(resource_decisions, active_flow_findings, restore_findings, True)
     steps = planner.plan_steps(
         status, resource_decisions, active_flow_findings, restore_findings,
         compliant_flow_states, compliant_backup_states,

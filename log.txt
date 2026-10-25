@@ -1165,3 +1165,29 @@ branch=main
 repo_root=/home/claude/hackerrank-orchestrate-october26
 worktree=main
 parent_agent=none
+
+## [2026-10-25T07:56:45Z] Phase 4: guarded AI layer (intent, images, security, ledger)
+
+User Prompt (verbatim, secrets redacted):
+Phase 4 kickoff prompt: F13 intent classifier (Groq qwen/qwen3.8-27b), F05 image reading (RapidOCR grounding + two Gemini readers, gemini-3.1-flash-lite primary and gemini-3.8-flash budgeted second), S1/S2 security controls (sanitize.py, untrusted-data wrapping), E4 token ledger and rate limiter, intent/image evaluation reports, security injection tests I1-I8, usage report generator, quality gates. No change to policy/linker/planner semantics except wiring intent and image observations in.
+
+Agent Response Summary:
+Built code/audit/llm/{client,cache,limiter,usage,schemas}.py: token-bucket limiter, exponential backoff + jitter, 90s hard timeout via a thread pool, persisted per-day budget for gemini-3.8-flash, JSONL usage ledger, content-addressed cache, --no-ai hard-gated via AIDisabledError. Built code/audit/security/sanitize.py (NFKC, zero-width/control strip, instruction-phrase detection in en/es/fr/pt/ja/ko, encoded-blob detection, untrusted-data wrapping). Built code/audit/intent.py: a deterministic multilingual rule layer (sentence-scoped, so an injected negation sentence cannot retroactively flip a genuine deletion request earlier in the same text -- found via I5 security testing) plus Qwen plus single-text escalation, wired into case_runner.py replacing the Phase 3 placeholder; NOT_APPLICABLE now short-circuits before any linking work. Verified all 32 samples classify DELETE; ran the full 518-case live classification (10 NOT_APPLICABLE, 0 disagreements, 0 flagged -- exactly matching D10's ~10-case prediction). Authored code/evaluation/intent_cases.py (44 cases, combined pipeline 100% after the hedge-phrase and sentence-scoping fixes) and intent_review.py (518-case review). Built the vision pipeline (code/audit/evidence/{ocr_adapter,image_reader}.py): RapidOCR grounding, dual Gemini readers, agreement-only fields, resource-id shape validation (fixed a real bug where a reader extracted UI labels like "Delivery tracking" as if they were resource ids -- grounding alone was not enough, now also requires a known mapping.py prefix shape), DocumentHint-based same_document linking (never baking identifiers directly into every resource's link_keys, to avoid the same cross-person contamination class fixed in Phase 3b). Wired into the registry with ai_enabled threaded through and the cache key including it, so a cold --no-ai run can never poison a later live run's cache. Wrote 10 security injection tests (I1-I3, I5, I7, I8 passing without any live call; I4 built and gated behind --run-live-ai; I6 confirmed already green). Built code/tools/make_usage_report.py, proven against the live ledger. Ran the full live pipeline on all 518 real cases: 0 live model calls (fully cache-served), status COMPLETE=163/INCOMPLETE=345/NOT_APPLICABLE=10, confirmed identical on --no-ai.
+
+Actions:
+* wrote: code/audit/llm/{client,cache,limiter,usage,schemas}.py, code/audit/security/sanitize.py, code/audit/intent.py, code/audit/evidence/{ocr_adapter,image_reader}.py, code/prompts/{intent_v1,vision_v1}.md, code/evaluation/{intent_cases,intent_review,image_facts_report}.py, code/tools/make_usage_report.py, code/tests/{conftest,test_security_injection}.py
+* edited: code/audit/case_runner.py, code/audit/trace_writer.py, code/audit/mapping.py, code/audit/evidence/registry.py, code/main.py, code/evaluation/main.py, code/config.py, README.md, code/requirements.txt (added rapidocr-onnxruntime)
+* cmd: python -m pytest code/tests -q -> 167 passed, 2 skipped
+* cmd: python code/main.py --no-ai -> 518 rows, 0 live calls, status COMPLETE=163/INCOMPLETE=345/NOT_APPLICABLE=10
+* cmd: python code/main.py (live) -> 0 live calls (fully cached), identical to --no-ai
+* cmd: python code/evaluation/main.py -> status accuracy 1.000 (32/32), all 32 DELETE
+* cmd: python code/evaluation/image_facts_report.py -> 11/11 images read, D16 re-check: no SECONDARY_IDENTIFIER/PRODUCT_TELEMETRY found
+* cmd: python code/tools/make_usage_report.py -> proven against the live ledger
+
+Context:
+tool=Claude Code
+model=claude-sonnet-5
+branch=main
+repo_root=C:\Users\shrut\hackerrank-orchestrate-october26
+worktree=main
+parent_agent=none
