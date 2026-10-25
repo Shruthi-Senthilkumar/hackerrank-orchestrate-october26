@@ -23,3 +23,4 @@ Both providers are used on their free tiers in this project; the `estimated cost
 - Estimated total cost (list price): $1.1898
 - Estimated average cost per request (list price): $0.002895
 - Actual incurred cost (both providers on free tier for this run): $0.00
+- Per dataset request (all 518 deletion requests): 1806.4 tokens, $0.002297 estimated list-price cost (intent calls are batched, images are read once, so this is below the per-logical-request average)

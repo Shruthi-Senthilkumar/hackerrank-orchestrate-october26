@@ -84,6 +84,8 @@ def build_report(entries: list[dict]) -> str:
     lines.append(f"- Estimated total cost (list price): ${total_cost:.4f}")
     lines.append(f"- Estimated average cost per request (list price): ${(total_cost / total_calls):.6f}" if total_calls else "- Estimated average cost per request: n/a")
     lines.append(f"- Actual incurred cost (both providers on free tier for this run): $0.00")
+    n_dataset_requests = 518  # rows of dataset/deletion_requests.csv in the final run
+    lines.append(f"- Per dataset request (all {n_dataset_requests} deletion requests): {total_tokens / n_dataset_requests:.1f} tokens, ${total_cost / n_dataset_requests:.6f} estimated list-price cost (intent calls are batched, images are read once, so this is below the per-logical-request average)")
 
     return "\n".join(lines) + "\n"
 

@@ -39,6 +39,17 @@
 - D16 re-checked against all 11 images: no SECONDARY_IDENTIFIER or PRODUCT_TELEMETRY found.
 - Full per-image counts in code/evaluation/extracted_image_facts.md.
 
+## Custom evaluation cases (authored by us, not from the dataset)
+
+Built as synthetic module-level inputs in code/tests/test_custom_evaluation_cases.py; no dataset files are used. Each runs the real decision, detector and planner modules.
+
+| Case | Input | Expectation | Result |
+|---|---|---|---|
+| A: replica drift | A USER_PROFILE record that a replica still holds although the primary lacks it | Violation, status INCOMPLETE, steps REPORT_REMAINING_RECORD, DELETE_RECORD, VERIFY_RECORD_ABSENT | PASS |
+| B: compliant tombstone, audit, analytics | A redacted tombstone with no direct identifier, a security audit record within retention, an analytics record already unlinked | No violation, status COMPLETE, only VERIFY_RECORD_REDACTED / VERIFY_RECORD_PRESENT / VERIFY_RECORD_ABSENT steps, every step cites evidence | PASS |
+| C: active flow and restorable backup | An enabled data flow, a restore-allowed backup, and a dependent USER_PROFILE record | INCOMPLETE; DISABLE_DATA_FLOW and BLOCK_RESTORE come before DELETE_RECORD; verification covers all three | PASS |
+| D: non-deletion request | Intent is not a deletion request | NOT_APPLICABLE with steps [] regardless of any resource state | PASS |
+
 ## Security (I1-I8)
 
 | Test | Description | Result |

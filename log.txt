@@ -1256,3 +1256,24 @@ branch=main
 repo_root=C:\Users\shrut\hackerrank-orchestrate-october26
 worktree=main
 parent_agent=none
+
+## [2026-10-25T12:02:29Z] Final verification; reports completed; keys question answered
+
+User Prompt (verbatim, secrets redacted):
+I didnt give any apy kep still then how is it testing?
+
+Agent Response Summary:
+Explained that the keys were already in the local .env since Phase 0 (check_keys showed both set), that the live calls and cache were produced then, and that the final tests and run are keyless by design through the committed code/replay/ folder. Verified commit 47dcc19 from a fresh clone with no .env and no keys: main.py --no-ai made 0 model calls and wrote a byte-identical output.csv, and 172 tests passed. Validated output.csv (518 rows, sorted, header exact, ids match requests, no BOM or CRLF, step numbering consecutive), the reports, the README and a secret scan. Found the evaluation report lacked the required custom cases section and the usage report lacked a per-518 average; fixed both in the generators and reports.
+
+Actions:
+* cmd: git clone of the fork into /tmp, keyless main.py --no-ai, cmp against committed output.csv -> identical; pytest -> 172 passed, 1 skipped
+* cmd: python validation of output.csv; secret scan -> 0 hits; log_tools.py check -> OK
+* edited: code/evaluation/main.py (custom cases section), code/evaluation/evaluation_report.md, code/tools/make_usage_report.py, code/evaluation/usage_report.md
+
+Context:
+tool=Claude Code
+model=claude-sonnet-5-5
+branch=main
+repo_root=/home/claude/hackerrank-orchestrate-october26
+worktree=main
+parent_agent=none
