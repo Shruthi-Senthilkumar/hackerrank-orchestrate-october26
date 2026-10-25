@@ -1019,3 +1019,25 @@ branch=main
 repo_root=C:\Users\shrut\hackerrank-orchestrate-october26
 worktree=main
 parent_agent=none
+
+## [2026-10-25T03:07:17Z] Phase 3 review: over-linking found, Phase 3b released
+
+User Prompt (verbatim, secrets redacted):
+(Attached the Phase 3 terminal report: all 9 exit criteria PASS, scorer on 32 samples with status accuracy 1.000, step precision/recall/F1 0.958/0.819/0.883, field accuracy 0.907, sequence accuracy 0.219, citation accuracy 1.000; 35 missing steps attributed to D17; a calibration table; 518-case run with 166 COMPLETE and 352 INCOMPLETE; waiting for go-ahead for Phase 4.)
+
+Agent Response Summary:
+Pulled the Phase 3 commits, ran the 153 tests (pass), the log check (OK), the pipeline and the scorer (numbers reproduce). Inspected output.csv and found 18 INCOMPLETE rows with 40 to 85 steps and different users with identical 93-resource linked sets, caused by the transitive reference_closure rule, plus 24 zero-step COMPLETE rows and several single-sample calibrations. Recorded D18 and wrote claude_terminal/phases/phase_3b.md.
+
+Actions:
+* cmd: git pull; pytest code/tests -q -> 153 passed; log_tools.py check -> OK; python code/main.py --no-ai; python code/evaluation/main.py -> scorer reproduced
+* cmd: ad hoc analysis of output.csv step counts, zero-step COMPLETE rows, and linked rules for outlier cases
+* edited: claude_terminal/DECISIONS.md (D18), claude_terminal/README.md
+* wrote: claude_terminal/phases/phase_3b.md
+
+Context:
+tool=Claude Code
+model=claude-sonnet-5-5
+branch=main
+repo_root=/home/claude/hackerrank-orchestrate-october26
+worktree=main
+parent_agent=none

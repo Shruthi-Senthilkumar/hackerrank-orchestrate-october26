@@ -20,7 +20,8 @@ It is not part of the submission: `code.zip` contains only `README.md` and `code
 | 1 | Safe data foundation | `phases/phase_1.md` | Done. Reviewed and passed (61/61 tests also pass on Linux). |
 | 2 | Identity and evidence | `phases/phase_2.md` | Built; review found a linker recall gap, fix-up phase 2b released |
 | 2b | Linker recall fix-up | `phases/phase_2b.md` | Done. Reviewed and passed (97 tests). 12 unattributable pairs accepted as D17. |
-| 3 | Rules-only baseline | `phases/phase_3.md` | Released |
+| 3 | Rules-only baseline | `phases/phase_3.md` | Built (153 tests pass, 32/32 sample status). Review found over-linking; fix-up 3b released |
+| 3b | Over-linking fix and calibration audit | `phases/phase_3b.md` | Released |
 | 4 | Guarded AI layer | not released | Locked |
 | 5 | Test and harden | not released | Locked |
 | 6 | Ship | not released | Locked |
