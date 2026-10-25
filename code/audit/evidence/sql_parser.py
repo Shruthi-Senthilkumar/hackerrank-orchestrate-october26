@@ -77,7 +77,7 @@ def _row_to_observation(
         inner = json.loads(row.pop("record_json"))
         row.update(inner)
     resource_id = row.get("resource_id")
-    identifiers, link_keys, attrs = normalize.classify_record(row)
+    identifiers, link_keys, attrs, references = normalize.classify_record(row)
     if resource_id:
         link_keys.add(resource_id)
     system_id, category = _resolve_system_and_category(resource_id, collection_hint)
@@ -93,6 +93,7 @@ def _row_to_observation(
         identifiers_present=frozenset(identifiers),
         attrs=attrs,
         link_keys=frozenset(k for k in link_keys if k),
+        references=frozenset(r for r in references if r and r != resource_id),
     )
 
 

@@ -30,10 +30,33 @@ An Observation belongs to a person iff, at audit_at:
     document (file_id) instead of trace_id; see
     code/audit/evidence/pdf_parser.py's DocumentHint extraction. A
     document whose only identifier belongs to someone else never links.
-(e) it is referenced by an already-linked resource (e.g. a search
-    document's source_resource_id pointing at a linked account, or an
-    export pointing at a search document) -- computed as a closure over
-    shared link_key values.
+(e) (Phase 3b rewrite) it is EXPLICITLY, DIRECTEDLY referenced by an
+    already-linked resource via a `*_resource_id`-shaped field (never
+    the bare `resource_id` itself) whose value has a recognized
+    code/audit/mapping.py prefix shape -- e.g. the real
+    `search_documents_primary.source_resource_id` column pointing at an
+    account. This is code/audit/models.py's `Observation.references`,
+    populated only by code/audit/evidence/normalize.py's
+    classify_record. ONE hop only (REFERENCE_CLOSURE_MAX_HOPS below):
+    the target is never itself used as a new source. Two more guards
+    apply before a reference is trusted:
+      - hub guard: if the SAME target is referenced by source resources
+        that themselves carry more than one DISTINCT identity value
+        (email/phone/hash/user_id -- never a resource id), the target is
+        a hub (e.g. a shared cohort/region/status value that coincides
+        with many unrelated people) and is never linked, for anyone.
+      - conflicting-identity guard: if the target itself already carries
+        an identity value that is NOT in the current person's identity
+        set, it visibly belongs to someone else and is never linked to
+        this person, even with no hub and no other guard involved.
+    This REPLACES the earlier any-shared-key transitive closure (Phase
+    3), which also matched through emails, phones, hashes, user_ids,
+    customer_reference/subject_reference, and even a parser artifact
+    (the literal text "null" standing in for an absent log field --
+    fixed separately in code/audit/evidence/log_parser.py) -- diagnosed
+    on case_51/case_77, where that shared-key closure had pulled in 88
+    and 76 resources respectively, including one resource
+    (account_3785) linked to BOTH of two different, unrelated people.
 
 A name alone never links (names are not in link_keys at all; see
 code/audit/evidence/normalize.py, which stores a name as an identifier
@@ -48,11 +71,18 @@ from pathlib import Path
 
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+    from audit import mapping
     from audit.models import DocumentHint, Identity, Observation, TraceHint
     from audit.timeview import TimeView
 else:
+    from . import mapping
     from .models import DocumentHint, Identity, Observation, TraceHint
     from .timeview import TimeView
+
+#: Phase 3b: reference_closure bridges exactly one hop from an already
+#: (non-reference-closure) linked resource to the resource it explicitly
+#: references. The target's own references are never followed further.
+REFERENCE_CLOSURE_MAX_HOPS = 1
 
 _LINK_ACTIVITY_RE = re.compile(
     r"(?:linked|confirmed)\s+(\S+)\s*\([^)]*\)\s*(?:to|belongs only to)\s+"
@@ -118,12 +148,24 @@ def link_observations(
     resource_keys: dict[str, set[str]] = {
         rid: set().union(*(o.link_keys for o in obs_list)) for rid, obs_list in by_resource.items()
     }
+    # Phase 3b: cloud_runtime_export's own correlation key is named
+    # `requestId`, not `trace_id` (see code/audit/evidence/log_parser.py's
+    # module docstring) -- fall back to it exactly like the TraceHint
+    # side already does, so a resource-bearing line from that family can
+    # still be found via its own correlation key.
     resource_trace_ids: dict[str, set[str]] = {
-        rid: {o.attrs["trace_id"] for o in obs_list if o.attrs.get("trace_id")}
+        rid: {
+            o.attrs["trace_id"] if o.attrs.get("trace_id") else o.attrs["requestId"]
+            for o in obs_list
+            if o.attrs.get("trace_id") or o.attrs.get("requestId")
+        }
         for rid, obs_list in by_resource.items()
     }
     resource_source_ids: dict[str, set[str]] = {
         rid: {o.source_id for o in obs_list} for rid, obs_list in by_resource.items()
+    }
+    resource_references: dict[str, set[str]] = {
+        rid: set().union(*(o.references for o in obs_list)) for rid, obs_list in by_resource.items()
     }
 
     rule_by_resource: dict[str, LinkRule] = {}
@@ -141,21 +183,48 @@ def link_observations(
         if resource_source_ids.get(rid, set()) & matching_documents.keys():
             rule_by_resource[rid] = "same_document"
 
-    # closure: anything referenced by (sharing a link key with) an already
-    # linked resource is linked too, via the "reference_closure" rule.
-    key_to_resources: dict[str, set[str]] = defaultdict(set)
-    for rid, keys in resource_keys.items():
-        for key in keys:
-            key_to_resources[key].add(rid)
+    # reference_closure: exactly one directed hop from a resource ALREADY
+    # linked by one of the rules above (never from another
+    # reference_closure hit -- see REFERENCE_CLOSURE_MAX_HOPS) to a
+    # resource it explicitly references. `resource_identity_values` is
+    # each resource's OWN identity-shaped link keys -- everything except
+    # its own id and anything shaped like a resource id -- used by both
+    # guards below; a resource with no identity value of its own (the
+    # common, intended case) has an empty set here, which is harmless.
+    def _identity_values(rid: str) -> set[str]:
+        return {v for v in resource_keys.get(rid, set()) if v != rid and not mapping.prefix_for_resource_id(v)}
 
-    frontier = list(rule_by_resource.keys())
-    while frontier:
-        rid = frontier.pop()
-        for key in resource_keys.get(rid, set()):
-            for neighbor in key_to_resources.get(key, set()):
-                if neighbor not in rule_by_resource:
-                    rule_by_resource[neighbor] = "reference_closure"
-                    frontier.append(neighbor)
+    resource_identity_values = {rid: _identity_values(rid) for rid in resource_keys}
+
+    # Hub guard: a target referenced by sources that carry more than one
+    # DISTINCT identity value is ambiguous (a cohort/region/status-like
+    # value that happens to coincide with many unrelated people, or
+    # several different people's resources pointing at the same place)
+    # and is never linked via reference_closure, for anyone.
+    sources_by_target: dict[str, set[str]] = defaultdict(set)
+    for rid, targets in resource_references.items():
+        for target in targets:
+            sources_by_target[target].add(rid)
+    hub_targets = {
+        target
+        for target, sources in sources_by_target.items()
+        if len(set().union(*(resource_identity_values.get(s, set()) for s in sources))) > 1
+    }
+
+    directly_linked = list(rule_by_resource.keys())
+    for rid in directly_linked:
+        for target in resource_references.get(rid, set()):
+            if target in rule_by_resource or target not in resource_keys:
+                continue
+            if target in hub_targets:
+                continue
+            # Conflicting-identity guard: the target already visibly
+            # belongs to someone else (an identity value that is not in
+            # THIS person's identity set) -- never link it to this
+            # person even though no hub is involved.
+            if resource_identity_values.get(target, set()) - identity_keys:
+                continue
+            rule_by_resource[target] = "reference_closure"
 
     linked: list[LinkedObservation] = []
     for rid, rule in rule_by_resource.items():

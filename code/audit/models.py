@@ -48,6 +48,17 @@ class Observation:
     identifiers_present: frozenset[str] = field(default_factory=frozenset)
     attrs: dict[str, Any] = field(default_factory=dict)
     link_keys: frozenset[str] = field(default_factory=frozenset)
+    references: frozenset[str] = field(default_factory=frozenset)
+    """Resource ids this record EXPLICITLY, directedly points at (e.g. a
+    `source_resource_id` column), never an identity value. Populated only
+    by code/audit/evidence/normalize.py's classify_record, for a field
+    name shaped like `*_resource_id` (never the bare `resource_id` key
+    itself) whose value also has a recognized code/audit/mapping.py
+    prefix shape. Kept fully separate from `link_keys` (which blends
+    identity values and the record's own id) so
+    code/audit/linker.py's reference_closure rule can use ONLY this
+    field -- never an email/phone/hash/user_id/name -- to bridge one
+    hop from an already-linked resource to another."""
 
 
 @dataclass(frozen=True)

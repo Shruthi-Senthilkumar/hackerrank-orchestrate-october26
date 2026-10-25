@@ -43,12 +43,14 @@ The blank template at `dataset/output.csv` is provided as a reference. Your fina
 
 ## Setup and Run
 
-Status as of Phase 0: repo skeleton, virtual environment, and provider smoke
-tests only. **The audit pipeline itself is not implemented yet** —
-`python code/main.py` currently prints the planned pipeline and exits without
-auditing any case. `code/evaluation/main.py` is an empty stub. Evaluation
-reports under `code/evaluation/` are placeholders. This section will be
-updated as later phases land.
+Status as of Phase 3b: the rules-only baseline is implemented end to end.
+`python code/main.py --no-ai` runs every case in
+`dataset/deletion_requests.csv` through identity resolution, evidence
+linking, policy evaluation, detectors, decision, and planning, and writes
+`output.csv` at the repository root. The AI/intent-classification layer
+(`python code/main.py` without `--no-ai`) is Phase 4 scope and not yet
+implemented. Evaluation reports under `code/evaluation/` are filled in as
+later phases land.
 
 ### 1. Clone and enter the repo
 
@@ -95,15 +97,22 @@ python code/tools/check_keys.py
 
 This prints only `set` or `missing` per key.
 
-### 4. Run the pipeline (not yet implemented)
+### 4. Run the pipeline
 
 ```bash
-python code/main.py                 # full pipeline; currently prints the plan only
-python code/main.py --no-ai         # rules-only baseline; currently prints the plan only
-python code/main.py --cases case_01 # debug a single case id; currently prints the plan only
+python code/main.py --no-ai           # rules-only baseline; writes output.csv at the repo root
+python code/main.py --no-ai --cases case_33,case_34  # debug a subset of case ids (comma-separated)
+python code/main.py --no-ai --trace   # also writes a per-case trace under agent-trace/ (git-ignored)
+python code/main.py                   # full pipeline (AI/intent layer) -- Phase 4, not yet implemented
 ```
 
-### 5. Run evaluation (not yet implemented)
+### 5. Run the scorer
+
+The scorer (`code/evaluation/main.py`) is the one script, besides
+`code/evaluation/link_check.py`, allowed to read `dataset/sample_output.csv`
+— the audit pipeline itself never does. Run it after `code/main.py --no-ai`
+to check status accuracy, step precision/recall/F1, field-level accuracy,
+sequence accuracy, and citation accuracy on the 32 public samples:
 
 ```bash
 python code/evaluation/main.py

@@ -1060,3 +1060,28 @@ branch=main
 repo_root=/home/claude/hackerrank-orchestrate-october26
 worktree=main
 parent_agent=none
+
+## [2026-10-25T03:43:37Z] Phase 3b: reference_closure rewrite, cross-person-link fixes
+
+User Prompt (verbatim, secrets redacted):
+Phase 3b fix-up prompt: (1) diagnose and fix linker.py's reference_closure (directed one-hop only, hub guard, conflicting-identity guard, decoy tests, global cross-person invariant check over all 518 cases); (2) re-run all 518 cases, report before/after status counts/flips/rows-over-14-steps/scorer/link_check; (3) classify the 24 zero-step COMPLETE cases (nothing-exists / parser-or-linker-gap / other), fix any generic gap found and re-run; (4) calibration audit replacing text-matching/single-sample rules with data-field-grounded ones, with branch counts; (5) document the scorer command in the README; (6) quality gates, commit and push to origin only, not output.csv.
+
+Agent Response Summary:
+Diagnosed case_51/case_77: the old any-shared-key reference_closure matched through a literal "null" placeholder string (a log field with no value, read as if it were a real identifier) and pulled in 88/76 resources each, including one resource linked to two different people. Rewrote reference_closure in code/audit/linker.py to use a new Observation.references field (code/audit/models.py, populated only by code/audit/evidence/normalize.py for a real *_resource_id-shaped field whose value has a known mapping.py prefix -- the actual search_documents_primary.source_resource_id column), one directed hop only, with a hub guard (a target referenced by sources carrying more than one distinct identity value is never linked) and a conflicting-identity guard (a target that already carries someone else's identifier is never linked). Added the literal-"null" fix in code/audit/evidence/log_parser.py (the real source of the bridging hub). While building the required global cross-person invariant check (0 violations required), found and fixed a SECOND, independent, pre-existing bug: code/audit/evidence/log_parser.py's _parse_operations_stream split on "|" without accounting for a leading pipe after the timestamp, shifting every field by one slot so a low-cardinality component name (e.g. "security_service") was read as trace_id -- a real cross-person hub via trace_correlation, affecting 10 different users in one file. Fixed the off-by-one split. Re-ran all 518 cases: reference_closure hits went from 620 to 0 (the one real-world pattern never needed it independently of an email), max linked-resource count per case from 93 to 6, 13 cases flipped INCOMPLETE->COMPLETE, rows exceeding 14 steps from 21 to 0. Classified the 24 zero-step COMPLETE cases: found and fixed two more genuine class-(b) gaps (cloud_runtime_export's `requestId` and syslog_archive's 3rd header token were real, reused per-request correlation keys, never wired into trace_correlation) -- re-running flipped 2 cases to correctly-INCOMPLETE and resolved 4 to real evidence-backed COMPLETE; one case (case_33) was investigated and left alone (a PDF's "ORD-" order reference is not a tracked deletion-rules.csv category, confirmed by checking it would require registering "ORD-" as a global resource-id shape and would misclassify ordinary orders dataset-wide as legal holds). Ran the calibration audit: replaced the SUPPORT_MESSAGE shared_context predicate's "any message text" heuristic with two real fields (ticket_id, message_excerpt/message_text), and the ANALYTICS_PROFILE->MARKETING_PROFILE override's text-matched "contact_lookup in event" disjunct was removed as redundant (never occurs without the real email_opt_in field). Updated README.md's stale Phase 0 status text and documented the scorer command. 32/32 sample status accuracy unchanged throughout. 157 pytest tests pass (41 new).
+
+Actions:
+* wrote: code/tests/test_invariants.py, code/tests/test_phase3.py additions
+* edited: code/audit/linker.py, code/audit/models.py, code/audit/evidence/normalize.py, code/audit/evidence/json_parser.py, code/audit/evidence/sql_parser.py, code/audit/evidence/log_parser.py, code/audit/evidence/registry.py, code/audit/policy.py, code/tests/test_linker.py, README.md
+* cmd: python -m pytest code/tests -q -> 157 passed, 1 skipped
+* cmd: python code/main.py --no-ai -> 518 rows, 0 validation failures, status COMPLETE=175/INCOMPLETE=343
+* cmd: python code/evaluation/main.py -> status accuracy 1.000 (32/32), unchanged throughout
+* cmd: python code/evaluation/link_check.py -> recall 0.676 (75/111), consistent with D17 gaps already investigated in Phase 3
+* cmd: global cross-person invariant test -> 0 violations
+
+Context:
+tool=Claude Code
+model=claude-sonnet-5
+branch=main
+repo_root=C:\Users\shrut\hackerrank-orchestrate-october26
+worktree=main
+parent_agent=none

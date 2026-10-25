@@ -92,6 +92,7 @@ def _observation_to_dict(obs: Observation) -> dict:
     d["observed_at"] = obs.observed_at.isoformat()
     d["identifiers_present"] = sorted(obs.identifiers_present)
     d["link_keys"] = sorted(obs.link_keys)
+    d["references"] = sorted(obs.references)
     return d
 
 
@@ -108,6 +109,7 @@ def _observation_from_dict(d: dict) -> Observation:
         identifiers_present=frozenset(d["identifiers_present"]),
         attrs=d["attrs"],
         link_keys=frozenset(d["link_keys"]),
+        references=frozenset(d.get("references", [])),
     )
 
 

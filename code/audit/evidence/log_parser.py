@@ -23,12 +23,21 @@ under any key) without yet having a resolved resource_id (e.g. a
 "profile_lookup_started" line), while a later line of the same
 trace_id has the resource_id but no identifier of its own (the
 matching "_completed" line). Every such identifier is collected into a
-TraceHint, keyed by trace_id, regardless of whether its own line has a
-resource_id. The only other trace-like key found in this dataset is
-`requestId` (cloud_runtime_export family); profiling showed it is
-unique per line there, never reused across lines the way trace_id is,
-so it is not treated as a correlation key. `correlation_id` does not
-appear anywhere in the data.
+TraceHint, regardless of whether its own line has a resource_id.
+
+Phase 3b correction: Phase 2b's own profiling note here previously
+claimed `requestId` (cloud_runtime_export family) is unique per line
+and never reused, so it was excluded as a correlation key. Re-checked
+while classifying zero-step COMPLETE cases (case_265/267/271/272/416/
+417): `requestId` IS reused across multiple lines of the same request
+exactly like `trace_id` is in every other family (343 distinct values
+across 433 lines in the cloud_runtime_export files, most appearing
+2-5 times, always a "_started"/"...completed" pair or triple) -- the
+original claim was simply wrong. `trace_id` and `requestId` never
+appear on the same line (they are exclusive to disjoint families), so
+`fields.get("trace_id") or fields.get("requestId")` is used as one
+correlation key with no collision risk. `correlation_id` still does
+not appear anywhere in the data.
 """
 
 import json
@@ -122,6 +131,22 @@ def _parse_bare_level_kv(rest: str) -> dict | None:
 
 
 def _parse_operations_stream(rest: str) -> dict | None:
+    # Phase 3b: the real file format puts a "|" directly after the
+    # timestamp's own separating space (e.g. "...Z | DEBUG | ..."), which
+    # _TIMESTAMP_RE's \s+ does not consume (it is not whitespace), so
+    # `rest` starts with this extra pipe. Splitting on "|" without
+    # stripping it shifted every field over by one: the real trace_id
+    # (a "tr-NNNNNNN" token) landed in `event`, and the real level (e.g.
+    # "DEBUG") landed in `trace_id` -- silently turning a low-cardinality
+    # component name (security_service/account_service/search_service...)
+    # into a fabricated "trace_id" shared by hundreds of unrelated
+    # people's lines. Confirmed by diagnosing case_51/case_77's
+    # cross-person-linked resources during Phase 3b's global invariant
+    # check (code/audit/linker.py's trace_correlation rule was working
+    # correctly; it was being fed this garbage trace_id).
+    rest = rest.strip()
+    if rest.startswith("|"):
+        rest = rest[1:]
     parts = [p.strip() for p in rest.split("|")]
     if len(parts) < 4:
         return None
@@ -148,12 +173,27 @@ def _parse_structured_json(rest: str) -> dict | None:
 
 
 def _parse_syslog(rest: str) -> dict | None:
-    m = re.match(r"^<\d+>\d+\s+\S+\s+\S+\s+\S+\s+-\s+-\s+(.*)$", rest)
+    # Phase 3b: the 3rd header token (after hostname and app-name) was
+    # discarded entirely. Checked across both syslog files: 223 of 232
+    # lines carry a "tr-NNNNNN"-shaped value there, reused 1-5 times
+    # across the same multi-step request (identical pattern to every
+    # other family's trace_id) -- e.g. a "audit_record_query_started"
+    # line with subject_ref but no resource_id, and a later
+    # "audit_record_read_completed" line sharing the SAME token with the
+    # resource_id but no identifier of its own (case_416's
+    # audit_record_8832). The remaining 9 lines use an infra-housekeeping
+    # value there instead (node-id/resolver-id/collector-id); those
+    # lines never carry a resource_id or a person identifier either, so
+    # capturing them the same way is harmless -- they can never produce
+    # a TraceHint or feed code/audit/linker.py's trace_correlation rule.
+    m = re.match(r"^<\d+>\d+\s+\S+\s+\S+\s+(\S+)\s+-\s+-\s+(.*)$", rest)
     if not m:
         return None
-    fields = _extract_kv(m.group(1))
+    trace_tok, tail = m.groups()
+    fields = _extract_kv(tail)
     if "level" not in fields:
         return None
+    fields["trace_id"] = trace_tok
     return fields
 
 
@@ -259,15 +299,20 @@ def _fields_to_observation(
         category = mapping.disambiguate_support_category(
             str(fields.get("event", "")), default=category, service=str(fields.get("service", ""))
         )
-    if category == "ANALYTICS_PROFILE" and (
-        "contact_lookup" in str(fields.get("event", "")) or "email_opt_in" in fields
-    ):
-        # A rare but distinct event shape (checked: appears exactly once
-        # across all 26 logs) carries an email_opt_in preference under an
-        # analytics_ prefixed resource_id/analytics_platform service --
-        # a marketing opt-in record, not analytics behavior tracking.
-        # MARKETING_PROFILE's required action (DELETE) matches the
-        # sample; the default ANONYMIZE would not.
+    if category == "ANALYTICS_PROFILE" and "email_opt_in" in fields:
+        # Phase 3b: grounded purely in a real data FIELD
+        # (`email_opt_in`, a genuine opt-in preference attribute),
+        # never in event-name text. The earlier version also matched
+        # "contact_lookup" in the event name as a second, text-based
+        # condition; checked across the whole dataset: "contact_lookup"
+        # never appears without "email_opt_in" and vice versa (each
+        # occurs exactly once, on the same line), so that disjunct was
+        # always redundant and is removed rather than kept as a
+        # text-matching rule. An analytics_-prefixed resource carrying
+        # its own opt-in preference is a marketing opt-in record, not
+        # analytics behavior tracking -- MARKETING_PROFILE's required
+        # action (DELETE) matches; the category default (ANONYMIZE)
+        # would not.
         category = "MARKETING_PROFILE"
 
     return Observation(
@@ -314,9 +359,19 @@ def parse_log_file(ev: EvidenceFile, resolved_path: Path) -> tuple[list[Observat
         if fields is None:
             unparsed += 1
             continue
+        # The log text format has no way to write a true null, so an
+        # absent field is written as the literal word "null" (e.g.
+        # "customer_email=null"). Phase 3b: this was being read as a
+        # real value -- identical across hundreds of otherwise-unrelated
+        # lines -- turning identifiers_present and link_keys into a
+        # false "email present" and a massive cross-person hub
+        # (code/audit/linker.py's reference_closure matched on it
+        # directly). Drop it exactly like JSON/SQL already drop a true
+        # null, before any identifier/trace-hint extraction sees it.
+        fields = {k: v for k, v in fields.items() if not (isinstance(v, str) and v.strip().lower() == "null")}
         event_time = _parse_ts(ts_text)
 
-        trace_id = fields.get("trace_id")
+        trace_id = fields.get("trace_id") or fields.get("requestId")
         if trace_id:
             for _kind, value in _identifier_values(fields):
                 trace_hints.append(TraceHint(trace_id=trace_id, value=value, event_time=event_time, source_id=ev.file_id))

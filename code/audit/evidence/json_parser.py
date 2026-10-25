@@ -73,7 +73,7 @@ def _record_to_observation(
     if result in ("FOUND", "NOT_FOUND"):
         exists = result == "FOUND"
 
-    identifiers, link_keys, attrs = normalize.classify_record(record)
+    identifiers, link_keys, attrs, references = normalize.classify_record(record)
     if resource_id:
         link_keys.add(resource_id)
     if result is not None:
@@ -95,6 +95,7 @@ def _record_to_observation(
         identifiers_present=frozenset(identifiers),
         attrs=attrs,
         link_keys=frozenset(k for k in link_keys if k),
+        references=frozenset(r for r in references if r and r != resource_id),
     )
 
 

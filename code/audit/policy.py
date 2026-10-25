@@ -79,27 +79,34 @@ def is_attributable(state: ResourceState) -> bool:
 
 def predicate_shared_context(state: ResourceState) -> tuple[Optional[bool], bool, str]:
     """SUPPORT_MESSAGE rule_05: conversation contains shared customer,
-    agent, or order context that must be retained. [CALIBRATE],
-    measured on the samples: an earlier version of this predicate only
-    matched order/ticket keywords and wrongly sent case_27/28's
-    support_4707/support_NNNN ("Customer contacted support about
-    account access.") through DELETE instead of REDACT -- that message
-    has no order/ticket word at all, yet the samples expect REDACT.
-    Every real support_ message observed across Phase 1/2/3 (order
-    disputes, delivery corrections, account-access contacts) is some
-    kind of support interaction with a customer, meaning shared context
-    in the rule's sense (a customer/agent exchange) is present whenever
-    the conversation has any content at all; no sample exercises a
-    support MESSAGE needing plain DELETE. So any existing message
-    content (or none, visible-but-unparsed) defaults True; this
-    predicate therefore always returns True in practice -- kept as a
-    real check, not hardcoded, so a future, genuinely contentless
-    support_ record can still be told apart from a real conversation.
+    agent, or order context that must be retained.
+
+    Phase 3b: replaced the earlier keyword-matched version (which
+    looked for "order"/"ticket" words inside message_excerpt/
+    message_text, then was widened to "any text at all" after it wrongly
+    sent an account-access message through DELETE) with two REAL data
+    fields, surveyed across every SUPPORT_MESSAGE/SUPPORT_ATTACHMENT
+    shape in the dataset:
+      - `ticket_id` (the JSON `customer_data_snapshot_bundle` shape,
+        e.g. "CS-7896"): an explicit order/ticket reference attached to
+        the record by the system itself, not inferred from any text.
+      - `message_excerpt` / `message_text`: the SQL support_records
+        table declares this column NOT NULL, and the JSON shape's own
+        message field is never empty either -- every support record in
+        this dataset structurally IS a customer-agent exchange, so its
+        mere (schema-guaranteed) presence establishes shared context
+        without reading or keyword-matching its content.
+    No case or sample in the dataset has a support record with neither
+    field, so the fallback (still True, REDACT over DELETE) is untested
+    in practice but kept as the safer read: a support interaction's
+    default assumption is that it was a real exchange, not that an
+    unreadable record never had one.
     """
-    text = str(state.attrs.get("message_excerpt") or state.attrs.get("message_text") or "")
-    if text:
+    if state.attrs.get("ticket_id"):
         return True, False, ""
-    return True, True, "no message text visible; fell back to assuming shared context (REDACT, not DELETE)"
+    if state.attrs.get("message_excerpt") or state.attrs.get("message_text"):
+        return True, False, ""
+    return True, True, "no ticket/order reference or message text visible; fell back to assuming shared context (REDACT, not DELETE)"
 
 
 def predicate_belongs_only_to_subject(state: ResourceState) -> tuple[Optional[bool], bool, str]:
