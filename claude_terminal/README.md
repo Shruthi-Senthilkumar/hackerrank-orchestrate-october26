@@ -21,8 +21,8 @@ It is not part of the submission: `code.zip` contains only `README.md` and `code
 | 2 | Identity and evidence | `phases/phase_2.md` | Built; review found a linker recall gap, fix-up phase 2b released |
 | 2b | Linker recall fix-up | `phases/phase_2b.md` | Done. Reviewed and passed (97 tests). 12 unattributable pairs accepted as D17. |
 | 3 | Rules-only baseline | `phases/phase_3.md` | Built (153 tests pass, 32/32 sample status). Review found over-linking; fix-up 3b released |
-| 3b | Over-linking fix and calibration audit | `phases/phase_3b.md` | Released |
-| 4 | Guarded AI layer | not released | Locked |
+| 3b | Over-linking fix and calibration audit | `phases/phase_3b.md` | Done. Reviewed and passed (158 tests). |
+| 4 | Guarded AI layer | `phases/phase_4.md` | Released |
 | 5 | Test and harden | not released | Locked |
 | 6 | Ship | not released | Locked |
 | 7 | Interview preparation | not released | Locked |
