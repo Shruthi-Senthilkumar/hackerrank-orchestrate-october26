@@ -1211,3 +1211,23 @@ branch=main
 repo_root=/home/claude/hackerrank-orchestrate-october26
 worktree=main
 parent_agent=none
+
+## [2026-10-25T08:08:41Z] Upload form structure check; keys status; final prompt amended
+
+User Prompt (verbatim, secrets redacted):
+(Attached a screenshot of the HackerRank upload flow: step 1 Upload Code as a ZIP including a README, max 50 MB; step 2 Upload Output; step 3 Upload Transcript.) 1. make sure our folder structure follows this format. 2. I didnt give any api key to terminal still 3. consider this before giving me prompt
+
+Agent Response Summary:
+Our submission layout matches the upload flow (README.md at the zip root plus code/, root output.csv, root log.txt). Added a required "Approach overview" section to the README task, a 50 MB zip limit check with a 40 MB internal cap, and a keys paragraph to the final prompt. The Phase 0 log entry (check_keys: GROQ_API_KEY set, GEMINI_API_KEY set) shows the keys already sit in the user's local .env and the live calls in Phase 4 used them, so no key handover is needed; the final run should need zero new live calls.
+
+Actions:
+* cmd: git pull; grep of log.txt and code/tools/check_keys.py for key-presence evidence (values never printed)
+* edited: claude_terminal/phases/phase_final.md
+
+Context:
+tool=Claude Code
+model=claude-sonnet-5-5
+branch=main
+repo_root=/home/claude/hackerrank-orchestrate-october26
+worktree=main
+parent_agent=none
