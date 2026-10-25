@@ -91,7 +91,7 @@ Must hold true:
 ## 6. Things to settle before you press submit
 
 - **The interview window starts at submission.** The AI Judge interview opens after a successful submission and stays open 12 hours. Do not submit a draft just to have something in. Check on the platform whether you can resubmit, and whether the first or the last submission is graded. Until that is confirmed, submit once, when the solution is final and you can be on camera for 30 minutes. This overrides the PRD's idea of an early valid submission.
-- **Deadline.** Not stated in the repo. Write down the start time of your 24 hours and the exact end time shown on the page.
+- **Deadline.** 18:00 IST on Sun 2026-10-25 (D19, stated by the user; AGENTS.md has none). Confirm against the countdown on the page.
 - **Submission link** (corrected upstream in `AGENTS.md` section 4.1): https://www.hackerrank.com/contests/hackerrank-orchestrate-october26/challenges/ghost-data-still-exists
 - **Size limits** for the three files are not stated. Check the upload form. The zip is small if `dataset/`, caches and environments are excluded.
 

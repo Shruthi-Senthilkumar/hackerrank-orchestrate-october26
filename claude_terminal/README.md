@@ -23,8 +23,8 @@ It is not part of the submission: `code.zip` contains only `README.md` and `code
 | 3 | Rules-only baseline | `phases/phase_3.md` | Built (153 tests pass, 32/32 sample status). Review found over-linking; fix-up 3b released |
 | 3b | Over-linking fix and calibration audit | `phases/phase_3b.md` | Done. Reviewed and passed (158 tests). |
 | 4 | Guarded AI layer | `phases/phase_4.md` | Released |
-| 5 | Test and harden | not released | Locked |
-| 6 | Ship | not released | Locked |
+| 5 | Test and harden (trimmed) | `phases/phase_5.md` | Written, locked until Phase 4 passes review |
+| 6 | Ship | `phases/phase_6.md` | Written, locked until Phase 5 passes review |
 | 7 | Interview preparation | not released | Locked |
 
 ## The loop for every phase
