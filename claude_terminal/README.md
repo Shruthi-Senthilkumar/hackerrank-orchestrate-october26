@@ -22,9 +22,9 @@ It is not part of the submission: `code.zip` contains only `README.md` and `code
 | 2b | Linker recall fix-up | `phases/phase_2b.md` | Done. Reviewed and passed (97 tests). 12 unattributable pairs accepted as D17. |
 | 3 | Rules-only baseline | `phases/phase_3.md` | Built (153 tests pass, 32/32 sample status). Review found over-linking; fix-up 3b released |
 | 3b | Over-linking fix and calibration audit | `phases/phase_3b.md` | Done. Reviewed and passed (158 tests). |
-| 4 | Guarded AI layer | `phases/phase_4.md` | Released |
-| 5 | Test and harden | merged into `phases/phase_5_6.md` | Merged (deadline) |
-| 6 | Ship | `phases/phase_5_6.md` | Combined prompt written; locked until Phase 4 is reviewed |
+| 4 | Guarded AI layer | `phases/phase_4.md` | Done (e2e14f8). Reviewed: intent and images work; clean-checkout replay gap fixed in the final prompt. |
+| 5 | Test and harden | merged into `phases/phase_final.md` | Merged (deadline) |
+| 6 | Ship | `phases/phase_final.md` | Released (40 minute limit) |
 | 7 | Interview preparation | not released | Locked |
 
 ## The loop for every phase
