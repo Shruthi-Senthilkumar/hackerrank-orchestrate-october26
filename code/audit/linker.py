@@ -22,7 +22,15 @@ An Observation belongs to a person iff, at audit_at:
     subject_key, correlation_key, match_key, or any email-shaped
     value). A trace hint whose own line falls after audit_at is
     ignored, even if its file is otherwise visible.
-(d) it is referenced by an already-linked resource (e.g. a search
+(d) (Phase 3 task 0) a free-text document (currently: PDFs) contains
+    both a known resource-id shape (code/audit/mapping.py's prefixes)
+    and an identifier of the person anywhere in its text, even if the
+    specific resource mention itself has no identifier right next to
+    it. Mirrors trace_correlation's mechanism exactly, grouped by
+    document (file_id) instead of trace_id; see
+    code/audit/evidence/pdf_parser.py's DocumentHint extraction. A
+    document whose only identifier belongs to someone else never links.
+(e) it is referenced by an already-linked resource (e.g. a search
     document's source_resource_id pointing at a linked account, or an
     export pointing at a search document) -- computed as a closure over
     shared link_key values.
@@ -40,10 +48,10 @@ from pathlib import Path
 
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-    from audit.models import Identity, Observation, TraceHint
+    from audit.models import DocumentHint, Identity, Observation, TraceHint
     from audit.timeview import TimeView
 else:
-    from .models import Identity, Observation, TraceHint
+    from .models import DocumentHint, Identity, Observation, TraceHint
     from .timeview import TimeView
 
 _LINK_ACTIVITY_RE = re.compile(
@@ -51,7 +59,7 @@ _LINK_ACTIVITY_RE = re.compile(
     r"([^\s]+@[^\s]+?)\s+and\s+(user_\d+)"
 )
 
-LinkRule = str  # "identity_key", "activity", "trace_correlation", "reference_closure"
+LinkRule = str  # "identity_key", "activity", "trace_correlation", "same_document", "reference_closure"
 
 
 @dataclass(frozen=True)
@@ -75,18 +83,19 @@ def _activity_links_visible(time_view: TimeView) -> dict[str, tuple[str, str]]:
     return links
 
 
-def _trace_values_matching_identity(
-    trace_hints: list[TraceHint], identity_keys: set[str]
+def _group_values_matching_identity(
+    hints: list, identity_keys: set[str], group_id_attr: str
 ) -> dict[str, set[str]]:
-    """trace_id -> the subset of its hinted values that match this
-    identity. Only trace_ids with at least one matching value are kept,
-    so an unrelated trace never has to be considered downstream."""
-    by_trace: dict[str, set[str]] = defaultdict(set)
-    for hint in trace_hints:
+    """group_id (trace_id or document_id) -> the subset of its hinted
+    values that match this identity. Only groups with at least one
+    matching value are kept, so an unrelated trace/document never has
+    to be considered downstream."""
+    by_group: dict[str, set[str]] = defaultdict(set)
+    for hint in hints:
         value = hint.value if hint.value.startswith("user_") else hint.value.strip().lower()
         if value in identity_keys:
-            by_trace[hint.trace_id].add(value)
-    return by_trace
+            by_group[getattr(hint, group_id_attr)].add(value)
+    return by_group
 
 
 def link_observations(
@@ -94,10 +103,12 @@ def link_observations(
     identity: Identity,
     time_view: TimeView,
     trace_hints: list[TraceHint] = (),
+    document_hints: list[DocumentHint] = (),
 ) -> list[LinkedObservation]:
     identity_keys = {identity.user_id} | identity.emails | identity.phones | identity.hashes
     activity_links = _activity_links_visible(time_view)
-    matching_traces = _trace_values_matching_identity(list(trace_hints), identity_keys)
+    matching_traces = _group_values_matching_identity(list(trace_hints), identity_keys, "trace_id")
+    matching_documents = _group_values_matching_identity(list(document_hints), identity_keys, "document_id")
 
     by_resource: dict[str, list[Observation]] = defaultdict(list)
     for obs in observations:
@@ -111,6 +122,9 @@ def link_observations(
         rid: {o.attrs["trace_id"] for o in obs_list if o.attrs.get("trace_id")}
         for rid, obs_list in by_resource.items()
     }
+    resource_source_ids: dict[str, set[str]] = {
+        rid: {o.source_id for o in obs_list} for rid, obs_list in by_resource.items()
+    }
 
     rule_by_resource: dict[str, LinkRule] = {}
     for rid, keys in resource_keys.items():
@@ -123,6 +137,9 @@ def link_observations(
             continue
         if resource_trace_ids.get(rid, set()) & matching_traces.keys():
             rule_by_resource[rid] = "trace_correlation"
+            continue
+        if resource_source_ids.get(rid, set()) & matching_documents.keys():
+            rule_by_resource[rid] = "same_document"
 
     # closure: anything referenced by (sharing a link key with) an already
     # linked resource is linked too, via the "reference_closure" rule.

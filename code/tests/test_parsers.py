@@ -172,16 +172,16 @@ def test_text_parser_on_a_tiny_synthetic_file(tmp_path):
 
 def test_pdf_parser_on_a_real_regular_pdf():
     ev = _real("legal_retention_register_20260529.pdf")
-    obs, info = pdf_parser.parse_pdf_file(ev, resolve_evidence(ev.file_path))
+    obs, info, _hints = pdf_parser.parse_pdf_file(ev, resolve_evidence(ev.file_path))
     assert info["regular"] is True
     assert len(obs) == 6
 
 
 def test_pdf_parser_on_a_real_irregular_pdf_reports_shape_not_observations():
     ev = _real("account_history_report_20260718.pdf")
-    obs, info = pdf_parser.parse_pdf_file(ev, resolve_evidence(ev.file_path))
+    obs, info, _hints = pdf_parser.parse_pdf_file(ev, resolve_evidence(ev.file_path))
     assert info["regular"] is False
-    assert obs == []
+    assert obs == []  # no mapping.py-prefixed resource-id shape anywhere in this document's text
     assert "text" in info and len(info["text"]) > 0
 
 

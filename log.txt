@@ -967,3 +967,30 @@ branch=main
 repo_root=/home/claude/hackerrank-orchestrate-october26
 worktree=main
 parent_agent=none
+
+## [2026-10-25T02:27:16Z] Phase 3: scorer, main.py wiring, E5 trace, 518-case sanity run
+
+User Prompt (verbatim, secrets redacted):
+Continuation after context compaction: resume Phase 3 exactly where left off (output.py validator had just passed all 32 samples), per the earlier Phase 3 kickoff prompt scoping F08-F12, E1, E5, no model calls, no Phase 4 work.
+
+Agent Response Summary:
+Built code/evaluation/main.py (E1 scorer: status accuracy, step precision/recall/F1 with and without evidence_id, field-level accuracy, sequence accuracy, citation accuracy, per-case results) and verified 32/32 status accuracy. Wired code/main.py --no-ai to run all 518 real cases through the full pipeline and write output.csv (not committed, per the user's explicit instruction). Built code/audit/trace_writer.py (E5 per-case trace, written under git-ignored agent-trace/). During a determinism check (same pipeline run twice, and under 4 different PYTHONHASHSEED values) found and fixed a real bug in code/audit/state.py: a scoped JSON bundle (evidence_45) embeds both case_473's own per-collection data AND an unrelated, comprehensive operational-history sub-collection (zero overlap with case_473) under a different store group in the same file; the old scoped-coverage check validated only file-wide person-overlap, so the unrelated sub-collection could non-deterministically outvote a real, same-timestamp positive observation depending on set-iteration (hash-seed) order. Fixed by scoping the person-overlap check to the same store group, and added a secondary (source_id) tie-break to compute_state's max() so any genuine same-timestamp tie resolves identically regardless of PYTHONHASHSEED. Re-verified: all 32 samples still 32/32 status-correct, byte-identical output.csv across 4 hash seeds, 0/518 validation failures. Added code/tests/test_phase3.py (52 tests: state-at-audit_at recency/replica-drift/coverage-absence/scoped-group gating/tie-break determinism, each policy predicate, each detector with a decoy, decision branches, planner phase/operation ordering, output validator rejecting every malformed step variant, writer LF/no-BOM bytes, serializer determinism). Full suite: 152 passed, 1 skipped.
+
+Actions:
+* wrote: code/evaluation/main.py
+* wrote: code/audit/trace_writer.py
+* edited: code/main.py
+* edited: code/audit/state.py (scoped-coverage group fix, source_id tie-break)
+* wrote: code/tests/test_phase3.py
+* cmd: python code/evaluation/main.py -> status accuracy 1.000 (32/32), step recall 0.819
+* cmd: python code/main.py --no-ai -> 518 rows written, 0 validation failures, runtime ~10.5s
+* cmd: python -m pytest code/tests -q -> 152 passed, 1 skipped
+* cmd: PYTHONHASHSEED=0/1/2/42 python code/main.py --no-ai -> output.csv byte-identical across all four seeds (md5 match)
+
+Context:
+tool=Claude Code
+model=claude-sonnet-5
+branch=main
+repo_root=C:\Users\shrut\hackerrank-orchestrate-october26
+worktree=main
+parent_agent=none

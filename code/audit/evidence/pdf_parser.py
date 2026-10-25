@@ -24,16 +24,23 @@ from pathlib import Path
 
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
+    from audit import mapping
     from audit.loaders import EvidenceFile
-    from audit.models import Observation
+    from audit.models import DocumentHint, Observation
 else:
+    from .. import mapping
     from ..loaders import EvidenceFile
-    from ..models import Observation
+    from ..models import DocumentHint, Observation
 
 _LEGAL_ROW_RE = re.compile(
     r"^(ORD-\d+)\s*\|\s*(user_\d+)\s*\|\s*([^|]+?)\s*\|\s*([^|]+?)\s*\|\s*([^|]+?)\s*\|\s*"
     r"Retain until\s*([^|]+?)\s*\|\s*(\S+)\s*$"
 )
+
+_EMAIL_RE = re.compile(r"[^@\s]+@[^@\s]+\.[^@\s]+")
+_USER_ID_RE = re.compile(r"\buser_\d+\b")
+_HASH_RE = re.compile(r"\b[0-9a-f]{64,}\b")
+_PHONE_RE = re.compile(r"\+\d{1,3}[\d\s\-]{6,}\d")
 
 
 def _extract_text(resolved_path: Path) -> tuple[str, int]:
@@ -144,17 +151,69 @@ _REGULAR_PARSERS = {
 }
 
 
-def parse_pdf_file(ev: EvidenceFile, resolved_path: Path) -> tuple[list[Observation], dict]:
-    """Returns (observations, report_info). report_info always has
-    'pages', 'text_chars', 'regular' (bool); when not regular it also
-    has 'text' (the full extracted text, for a human to review)."""
+def _same_document_signals(text: str, ev: EvidenceFile) -> tuple[list[Observation], list[DocumentHint]]:
+    """Phase 2b/Phase 3 task 0: a document that contains both a known
+    resource-id shape (mapping.py's prefixes) and an identifier of a
+    person (email, user_id, phone, or hash) yields one Observation per
+    resource id found, plus a DocumentHint per identifier found. Linking
+    those to one specific person's identity (and rejecting a document
+    that only has someone ELSE's identifier) is code/audit/linker.py's
+    job, not this parser's -- this only reports structural facts. Names
+    alone are never extracted as identifiers here.
+    """
+    resource_ids = sorted(set(mapping.find_resource_ids_in_text(text)))
+    identifiers = set(_EMAIL_RE.findall(text)) | set(_USER_ID_RE.findall(text))
+    identifiers |= set(_HASH_RE.findall(text))
+    identifiers |= {p.strip() for p in _PHONE_RE.findall(text)}
+
+    if not resource_ids or not identifiers:
+        return [], []
+
+    observations = []
+    for resource_id in resource_ids:
+        entry = mapping.mapping_for_resource_id(resource_id)
+        system_id = entry.system_id if entry else "unknown"
+        category = entry.data_category if entry else None
+        if category in ("SUPPORT_MESSAGE", "SUPPORT_ATTACHMENT"):
+            category = mapping.disambiguate_support_category(text, default=category)
+        observations.append(
+            Observation(
+                system_id=system_id,
+                resource_id=resource_id,
+                category=category,
+                store="same_document",
+                source_id=ev.file_id,
+                manifest_time=ev.captured_at,
+                observed_at=ev.captured_at,
+                exists=True,
+                identifiers_present=frozenset(),
+                attrs={},
+                link_keys=frozenset({resource_id}),
+            )
+        )
+
+    hints = [
+        DocumentHint(document_id=ev.file_id, value=value, event_time=ev.captured_at, source_id=ev.file_id)
+        for value in identifiers
+    ]
+    return observations, hints
+
+
+def parse_pdf_file(ev: EvidenceFile, resolved_path: Path) -> tuple[list[Observation], dict, list[DocumentHint]]:
+    """Returns (observations, report_info, document_hints). report_info
+    always has 'pages', 'text_chars', 'regular' (bool); when not regular
+    it also has 'text' (the full extracted text, for a human to
+    review)."""
     text, pages = _extract_text(resolved_path)
     lines = text.splitlines()
     stem = Path(ev.file_path).stem
+    same_doc_obs, same_doc_hints = _same_document_signals(text, ev)
 
     for prefix, parser in _REGULAR_PARSERS.items():
         if stem.startswith(prefix):
             observations = parser(lines, ev)
-            return observations, {"pages": pages, "text_chars": len(text), "regular": True, "shape": prefix}
+            info = {"pages": pages, "text_chars": len(text), "regular": True, "shape": prefix}
+            return observations, info, same_doc_hints
 
-    return [], {"pages": pages, "text_chars": len(text), "regular": False, "text": text}
+    info = {"pages": pages, "text_chars": len(text), "regular": False, "text": text}
+    return same_doc_obs, info, same_doc_hints

@@ -24,13 +24,13 @@ if __package__ in (None, ""):
     from audit import loaders, paths
     from audit.evidence import json_parser, log_parser, pdf_parser, sql_parser, text_parser
     from audit.evidence.sql_sandbox import SqlSandboxError
-    from audit.models import Coverage, Observation, TraceHint
+    from audit.models import Coverage, DocumentHint, Observation, TraceHint
     from audit.timeview import TimeView
 else:
     from .. import loaders, paths
     from . import json_parser, log_parser, pdf_parser, sql_parser, text_parser
     from .sql_sandbox import SqlSandboxError
-    from ..models import Coverage, Observation, TraceHint
+    from ..models import Coverage, DocumentHint, Observation, TraceHint
     from ..timeview import TimeView
 
 CACHE_DIR = Path(__file__).resolve().parent.parent.parent.parent / ".cache"
@@ -59,29 +59,29 @@ def _format_for_path(file_path: str) -> str:
 
 def _parse_one(
     ev: loaders.EvidenceFile,
-) -> tuple[list[Observation], list[Coverage], list[TraceHint], int, str]:
-    """Returns (observations, coverage, trace_hints, unparsed_count, format)."""
+) -> tuple[list[Observation], list[Coverage], list[TraceHint], list[DocumentHint], int, str]:
+    """Returns (observations, coverage, trace_hints, document_hints, unparsed_count, format)."""
     fmt = _format_for_path(ev.file_path)
     resolved = paths.resolve_evidence(ev.file_path)
 
     if fmt == "sql":
         obs, cov = sql_parser.parse_sql_file(ev, resolved)
-        return obs, cov, [], 0, fmt
+        return obs, cov, [], [], 0, fmt
     if fmt == "json":
         obs, cov = json_parser.parse_json_file(ev, resolved)
-        return obs, cov, [], 0, fmt
+        return obs, cov, [], [], 0, fmt
     if fmt == "log":
         obs, unparsed, hints = log_parser.parse_log_file(ev, resolved)
-        return obs, [], hints, unparsed, fmt
+        return obs, [], hints, [], unparsed, fmt
     if fmt == "text":
         obs, _snapshot_ts = text_parser.parse_text_file(ev, resolved)
-        return obs, [], [], 0, fmt
+        return obs, [], [], [], 0, fmt
     if fmt == "pdf":
-        obs, _info = pdf_parser.parse_pdf_file(ev, resolved)
-        return obs, [], [], 0, fmt
+        obs, _info, doc_hints = pdf_parser.parse_pdf_file(ev, resolved)
+        return obs, [], [], doc_hints, 0, fmt
     if fmt == "image":
         # Images are not read in Phase 2; deferred to Phase 4's vision model.
-        return [], [], [], 0, fmt
+        return [], [], [], [], 0, fmt
 
     raise RegistryError(f"no parser dispatch for format {fmt!r} ({ev.file_path})")  # pragma: no cover
 
@@ -120,7 +120,7 @@ def _coverage_to_dict(cov: Coverage) -> dict:
 def _coverage_from_dict(d: dict) -> Coverage:
     return Coverage(
         store=d["store"], collection=d["collection"], observed_at=datetime.fromisoformat(d["observed_at"]),
-        source_id=d["source_id"],
+        source_id=d["source_id"], scoped=d.get("scoped", False),
     )
 
 
@@ -133,6 +133,21 @@ def _trace_hint_to_dict(hint: TraceHint) -> dict:
 def _trace_hint_from_dict(d: dict) -> TraceHint:
     return TraceHint(
         trace_id=d["trace_id"],
+        value=d["value"],
+        event_time=datetime.fromisoformat(d["event_time"]),
+        source_id=d["source_id"],
+    )
+
+
+def _document_hint_to_dict(hint: DocumentHint) -> dict:
+    d = asdict(hint)
+    d["event_time"] = hint.event_time.isoformat()
+    return d
+
+
+def _document_hint_from_dict(d: dict) -> DocumentHint:
+    return DocumentHint(
+        document_id=d["document_id"],
         value=d["value"],
         event_time=datetime.fromisoformat(d["event_time"]),
         source_id=d["source_id"],
@@ -157,6 +172,7 @@ class RegistryResult:
         self.observations_by_file: dict[str, list[Observation]] = {}
         self.coverage_by_file: dict[str, list[Coverage]] = {}
         self.trace_hints_by_file: dict[str, list[TraceHint]] = {}
+        self.document_hints_by_file: dict[str, list[DocumentHint]] = {}
         self.parse_table: list[dict] = []
         self.errors: list[dict] = []
 
@@ -178,6 +194,12 @@ class RegistryResult:
             out.extend(hint_list)
         return out
 
+    def all_document_hints(self) -> list[DocumentHint]:
+        out = []
+        for hint_list in self.document_hints_by_file.values():
+            out.extend(hint_list)
+        return out
+
 
 def build_registry(use_cache: bool = True) -> RegistryResult:
     cache_key = _cache_key()
@@ -192,6 +214,8 @@ def build_registry(use_cache: bool = True) -> RegistryResult:
                     result.coverage_by_file[file_id] = [_coverage_from_dict(d) for d in cov_list]
                 for file_id, hint_list in cached.get("trace_hints_by_file", {}).items():
                     result.trace_hints_by_file[file_id] = [_trace_hint_from_dict(d) for d in hint_list]
+                for file_id, hint_list in cached.get("document_hints_by_file", {}).items():
+                    result.document_hints_by_file[file_id] = [_document_hint_from_dict(d) for d in hint_list]
                 result.parse_table = cached["parse_table"]
                 result.errors = cached["errors"]
                 return result
@@ -201,7 +225,7 @@ def build_registry(use_cache: bool = True) -> RegistryResult:
     result = RegistryResult()
     for ev in sorted(loaders.load_evidence_files(), key=lambda e: e.file_id):
         try:
-            obs, cov, hints, unparsed, fmt = _parse_one(ev)
+            obs, cov, hints, doc_hints, unparsed, fmt = _parse_one(ev)
         except (RegistryError, SqlSandboxError, ValueError, json.JSONDecodeError) as e:
             result.errors.append({"file_id": ev.file_id, "file_path": ev.file_path, "error": str(e)})
             result.parse_table.append(
@@ -217,6 +241,7 @@ def build_registry(use_cache: bool = True) -> RegistryResult:
         result.observations_by_file[ev.file_id] = obs
         result.coverage_by_file[ev.file_id] = cov
         result.trace_hints_by_file[ev.file_id] = hints
+        result.document_hints_by_file[ev.file_id] = doc_hints
         result.parse_table.append(
             {
                 "file_id": ev.file_id,
@@ -241,6 +266,10 @@ def build_registry(use_cache: bool = True) -> RegistryResult:
                 "trace_hints_by_file": {
                     fid: [_trace_hint_to_dict(h) for h in hints]
                     for fid, hints in result.trace_hints_by_file.items()
+                },
+                "document_hints_by_file": {
+                    fid: [_document_hint_to_dict(h) for h in hints]
+                    for fid, hints in result.document_hints_by_file.items()
                 },
                 "parse_table": result.parse_table,
                 "errors": result.errors,
@@ -290,6 +319,21 @@ def visible_trace_hints(result: RegistryResult, time_view: TimeView) -> list[Tra
     return out
 
 
+def visible_document_hints(result: RegistryResult, time_view: TimeView) -> list[DocumentHint]:
+    """Every DocumentHint whose file is visible AND whose own event_time
+    (the document's manifest time) is <= audit_at. See
+    code/audit/linker.py's same_document rule."""
+    visible_file_ids = {e.file_id for e in time_view.visible_evidence_files()}
+    out = []
+    for file_id, hint_list in result.document_hints_by_file.items():
+        if file_id not in visible_file_ids:
+            continue
+        for hint in hint_list:
+            if time_view.is_visible(hint.event_time):
+                out.append(hint)
+    return out
+
+
 if __name__ == "__main__":
     reg = build_registry()
     for row in reg.parse_table:
@@ -300,4 +344,5 @@ if __name__ == "__main__":
         for e in reg.errors:
             print(" ", e)
     print(f"\nTotal: {len(reg.all_observations())} observations, {len(reg.all_coverage())} coverage records, "
-          f"{len(reg.all_trace_hints())} trace hints, {len(reg.errors)} errors")
+          f"{len(reg.all_trace_hints())} trace hints, {len(reg.all_document_hints())} document hints, "
+          f"{len(reg.errors)} errors")

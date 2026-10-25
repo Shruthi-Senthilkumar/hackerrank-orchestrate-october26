@@ -15,6 +15,7 @@ link, not a customer PRODUCT_TELEMETRY record. Do not map either category
 until confirmed by the user.
 """
 
+import re
 from dataclasses import dataclass
 
 
@@ -98,3 +99,44 @@ def mapping_for_resource_id(resource_id: str) -> CategoryMapping | None:
     if prefix is None:
         return None
     return next(m for m in MAPPINGS if m.prefix == prefix)
+
+
+#: Matches any known prefix followed by digits, e.g. "account_001",
+#: "support_4218". Used to find resource-id-shaped tokens in free text
+#: (PDF/image documents), never to invent a new prefix.
+RESOURCE_ID_RE = re.compile(
+    "(" + "|".join(re.escape(m.prefix) for m in sorted(MAPPINGS, key=lambda m: -len(m.prefix))) + r")(\d+)\b"
+)
+
+
+def find_resource_ids_in_text(text: str) -> list[str]:
+    return [f"{prefix}{digits}" for prefix, digits in RESOURCE_ID_RE.findall(text)]
+
+
+def disambiguate_support_category(
+    context_text: str, default: str = "SUPPORT_MESSAGE", service: str = ""
+) -> str:
+    """support_ is ambiguous between SUPPORT_MESSAGE and SUPPORT_ATTACHMENT
+    (see the support_ mapping's note). Grounded in the real vocabulary
+    profiled across the 26 logs (attachment_pii_scan/attachment_scan_
+    started/thumbnail_failed vs. message_pii_scan/message_scan_started)
+    and reused here for PDF/document context text, which uses the same
+    words in plain English ("attachment", "thumbnail") vs. ("message").
+
+    A second, independent grounded signal: the `support_replica` log
+    family's own event vocabulary (contact_query_started/_completed,
+    deletion_marker_check, batch_started, checkpoint_saved) never uses
+    either keyword at all -- checked across its full event list -- so
+    when neither keyword matches, the originating service name is used
+    as a tiebreaker. support_replica never mentions message content,
+    only contact/attachment-style metadata checks, so it defaults to
+    SUPPORT_ATTACHMENT instead of the generic default.
+    """
+    lowered = context_text.lower()
+    if "attachment" in lowered or "thumbnail" in lowered:
+        return "SUPPORT_ATTACHMENT"
+    if "message" in lowered:
+        return "SUPPORT_MESSAGE"
+    if service == "support_replica":
+        return "SUPPORT_ATTACHMENT"
+    return default

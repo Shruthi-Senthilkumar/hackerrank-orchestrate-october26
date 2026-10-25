@@ -186,6 +186,16 @@ def _infer_exists(fields: dict) -> bool | None:
     http_status = fields.get("http_status")
     if http_status is not None:
         return str(http_status) == "200"
+    event_name = str(fields.get("event", ""))
+    if event_name.endswith("_started"):
+        # A "*_started" line (e.g. profile_lookup_started) has not
+        # concluded anything yet -- it often shares the resource_id of
+        # the later "*_completed" line that carries the real result, at
+        # the same timestamp in some log families. Claiming presence
+        # here would let a meaningless "started" marker outrank the
+        # real result; report unknown instead so only the concluding
+        # line's fact is used.
+        return None
     return True  # resource_id present with no negative indicator: presence implies existence
 
 
@@ -246,14 +256,19 @@ def _fields_to_observation(
     system_id = entry.system_id if entry else "unknown"
     category = fields.get("record_type") or (entry.data_category if entry else None)
     if category in ("SUPPORT_MESSAGE", "SUPPORT_ATTACHMENT"):
-        # Grounded in the real event vocabulary (profiled across all 26 logs):
-        # attachment_pii_scan / attachment_scan_started / thumbnail_failed
-        # vs. message_pii_scan / message_scan_started.
-        event_name = str(fields.get("event", ""))
-        if "attachment" in event_name or "thumbnail" in event_name:
-            category = "SUPPORT_ATTACHMENT"
-        elif "message" in event_name:
-            category = "SUPPORT_MESSAGE"
+        category = mapping.disambiguate_support_category(
+            str(fields.get("event", "")), default=category, service=str(fields.get("service", ""))
+        )
+    if category == "ANALYTICS_PROFILE" and (
+        "contact_lookup" in str(fields.get("event", "")) or "email_opt_in" in fields
+    ):
+        # A rare but distinct event shape (checked: appears exactly once
+        # across all 26 logs) carries an email_opt_in preference under an
+        # analytics_ prefixed resource_id/analytics_platform service --
+        # a marketing opt-in record, not analytics behavior tracking.
+        # MARKETING_PROFILE's required action (DELETE) matches the
+        # sample; the default ANONYMIZE would not.
+        category = "MARKETING_PROFILE"
 
     return Observation(
         system_id=system_id,

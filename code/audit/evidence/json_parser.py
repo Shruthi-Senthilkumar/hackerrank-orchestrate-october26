@@ -108,7 +108,9 @@ def _parse_bundle(data: dict, ev: EvidenceFile) -> tuple[list[Observation], list
         records = snap.get("records", [])
         for rec in _expand_resource_records(records):
             observations.append(_record_to_observation(rec, store, ev.file_id, ev.captured_at, observed_at))
-        coverage.append(Coverage(store=store, collection=collection, observed_at=observed_at, source_id=ev.file_id))
+        coverage.append(
+            Coverage(store=store, collection=collection, observed_at=observed_at, source_id=ev.file_id, scoped=True)
+        )
     return observations, coverage
 
 

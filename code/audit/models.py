@@ -73,6 +73,25 @@ class TraceHint:
 
 
 @dataclass(frozen=True)
+class DocumentHint:
+    """One identifier value found anywhere in a free-text document
+    (currently: the 2 PDFs with no regular row structure). Used only by
+    code/audit/linker.py's same_document rule: a document that contains
+    both a known resource-id shape and an identifier of the person
+    links every resource_id found in that same document to them. Mirrors
+    TraceHint's shape; kept as a separate type since "a trace" and "a
+    document" are different, non-interchangeable groupings even though
+    the matching mechanism (code/audit/linker.py's
+    _group_values_matching_identity) is shared.
+    """
+
+    document_id: str
+    value: str
+    event_time: datetime
+    source_id: str
+
+
+@dataclass(frozen=True)
 class Coverage:
     """Proof that a store/collection was actually inspected.
 
@@ -80,9 +99,22 @@ class Coverage:
     absence; the absence of a Coverage record means the question was
     simply never asked by any visible evidence, which is "unknown", not
     "absent".
+
+    `scoped`: True only for a JSON "snapshot bundle" (the
+    `customer_data_snapshot_bundle_*.json` family). Hand-checking
+    case_21 vs. case_31 (both linked to the same evidence_51 bundle,
+    which is case_31's own personalized evidence package -- its other
+    collections name only case_31's resources) showed a bundle is a
+    scoped, per-case evidence package, not a comprehensive platform
+    dump the way the SQL inventory/two-table files genuinely are
+    (dozens of unrelated people's rows in one file). A scoped
+    Coverage record may only prove absence for a person who already
+    has at least one OTHER resource observed in that same file;
+    everyone else's absence from it is simply not evidence about them.
     """
 
     store: str
     collection: str
     observed_at: datetime
     source_id: str
+    scoped: bool = False

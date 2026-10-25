@@ -54,6 +54,14 @@ def parse_text_file(ev: EvidenceFile, resolved_path: Path) -> tuple[list[Observa
         ts_text, system_id, resource_id, category, state, note = m.groups()
         observed_at = _parse_ts(ts_text)
         note = note.strip()
+        # The handover document prints "DATA_FLOW" in plain English; every
+        # other parser and code/audit/mapping.py use the canonical
+        # ACTIVE_DATA_FLOW sentinel (it is a detector concern, not a real
+        # deletion_rules.csv category -- see mapping.py's note). Normalize
+        # here so category comparisons elsewhere never have to special-
+        # case this one document's own wording.
+        if category == "DATA_FLOW":
+            category = "ACTIVE_DATA_FLOW"
 
         identifiers: set[str] = set()
         link_keys = {resource_id}
@@ -66,7 +74,7 @@ def parse_text_file(ev: EvidenceFile, resolved_path: Path) -> tuple[list[Observa
         attrs = {"state": state}
         if category == "BACKUP_ARCHIVE":
             attrs["restore_allowed"] = state == "ACTIVE"
-        elif category in ("DATA_FLOW", "ACTIVE_DATA_FLOW"):
+        elif category == "ACTIVE_DATA_FLOW":
             attrs["enabled"] = state == "ACTIVE"
 
         observations.append(
