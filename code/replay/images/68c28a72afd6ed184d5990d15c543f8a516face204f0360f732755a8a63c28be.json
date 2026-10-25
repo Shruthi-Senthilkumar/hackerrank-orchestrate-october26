@@ -1,0 +1,46 @@
+{
+  "agreed": {
+    "document_type": "console_screenshot",
+    "identifiers": [],
+    "observed_state_words": [
+      "Retained reference",
+      "Active"
+    ],
+    "resource_ids": [],
+    "system_id": "unknown",
+    "timestamps": [
+      "11 Jan 2024 08:42 UTC",
+      "10 Mar 2026 07:18 UTC",
+      "11 Jan 2024 08:45",
+      "14 Feb 2024 12:16",
+      "03 Jun 2024 09:27",
+      "22 Aug 2024 15:03",
+      "10 Mar 2026",
+      "22 Aug 2024",
+      "03 Jun 2024",
+      "14 Feb 2024",
+      "11 Jan 2024"
+    ]
+  },
+  "primary_usage": {
+    "input_tokens": 2321,
+    "latency_s": 8.657,
+    "model": "gemini-3.1-flash-lite",
+    "output_tokens": 249,
+    "prompt_version": "v1",
+    "provider": "gemini",
+    "thinking_tokens": 0
+  },
+  "report": {
+    "disagreements": 0,
+    "document_type": "console_screenshot",
+    "facts_dropped": 5,
+    "facts_extracted": 7,
+    "facts_grounded": 2,
+    "flagged": "second reader unavailable; using primary (grounded) only",
+    "second_reader_available": false,
+    "second_reader_used": false,
+    "system_id": "unknown"
+  },
+  "second_usage": null
+}

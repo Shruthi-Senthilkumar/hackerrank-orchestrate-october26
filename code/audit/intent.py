@@ -34,11 +34,11 @@ from typing import Optional
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
     import config
-    from audit.llm import client
+    from audit.llm import client, replay
     from audit.security import sanitize
 else:
     import config
-    from .llm import client
+    from .llm import client, replay
     from .security import sanitize
 
 RULE_DELETE = "DELETE"
@@ -219,14 +219,38 @@ def _valid_substring(evidence_phrase: str, original_text: str) -> bool:
     return bool(evidence_phrase) and evidence_phrase in original_text
 
 
+def _replay_to_result(case_id: str, replayed: dict, sanitize_flags: list) -> "IntentResult":
+    return IntentResult(
+        case_id=case_id, final_intent=replayed["final_intent"], rule_verdict=replayed["rule_verdict"],
+        qwen_intent=replayed["qwen_intent"], qwen_language=replayed["qwen_language"],
+        qwen_evidence_phrase=replayed["qwen_evidence_phrase"], escalated=replayed["escalated"],
+        resolution=replayed["resolution"], flagged=replayed["flagged"], sanitize_flags=sanitize_flags,
+    )
+
+
+def _flagged_unresolved(case_id: str, rule_verdict: str, sanitize_flags: list) -> "IntentResult":
+    """Final-phase task 1: a missing replay/.cache entry with no keys
+    (or ai disabled) must NEVER raise -- D10's safe default applies and
+    the case is flagged, but the run continues."""
+    return IntentResult(
+        case_id=case_id, final_intent="NOT_APPLICABLE", rule_verdict=rule_verdict,
+        qwen_intent=None, qwen_language=None, qwen_evidence_phrase=None, escalated=False,
+        resolution="unresolved_no_entry", flagged=True, sanitize_flags=sanitize_flags,
+    )
+
+
 def classify_all(requests: list, ai_enabled: bool) -> dict:
     """requests: list of objects with .case_id and .request_text
     (loaders.DeletionRequest, or anything with those two attributes).
-    Returns {case_id: IntentResult}."""
+    Returns {case_id: IntentResult}. Lookup order: code/replay/ ->
+    .cache/ (inside client.py) -> a live call only if ai_enabled. A
+    request missing everywhere never raises; it is flagged instead."""
     system_prompt = _load_system_prompt()
     rule_results: dict[str, tuple[str, str]] = {}
     sanitize_flags_by_case: dict[str, list] = {}
     sanitized_text_by_case: dict[str, str] = {}
+    out: dict[str, IntentResult] = {}
+    replayed_ids: set[str] = set()
 
     for req in requests:
         masked, flags = sanitize.sanitize(req.request_text)
@@ -234,27 +258,41 @@ def classify_all(requests: list, ai_enabled: bool) -> dict:
         sanitized_text_by_case[req.case_id] = masked
         rule_results[req.case_id] = rule_layer_classify(req.request_text)
 
-    order = [req.case_id for req in requests]
+        replayed = replay.get_intent(req.request_text)
+        if replayed is not None:
+            out[req.case_id] = _replay_to_result(req.case_id, replayed, flags)
+            replayed_ids.add(req.case_id)
+
+    order = [req.case_id for req in requests if req.case_id not in replayed_ids]
     text_by_case = {req.case_id: req.request_text for req in requests}
 
     qwen_by_case: dict[str, dict] = {}
+    unresolved_batches: set[str] = set()
     batch: list[str] = []
     batch_ids: list[str] = []
+
+    def flush_batch():
+        if not batch:
+            return
+        try:
+            results = client.intent_classify_batch(batch, ai_enabled, system_prompt)
+            for cid, r in zip(batch_ids, results):
+                qwen_by_case[cid] = r
+        except client.AIDisabledError:
+            unresolved_batches.update(batch_ids)
+
     for case_id in order:
         batch.append(sanitized_text_by_case[case_id])
         batch_ids.append(case_id)
         if len(batch) == config.INTENT_BATCH_SIZE:
-            results = client.intent_classify_batch(batch, ai_enabled, system_prompt)
-            for cid, r in zip(batch_ids, results):
-                qwen_by_case[cid] = r
+            flush_batch()
             batch, batch_ids = [], []
-    if batch:
-        results = client.intent_classify_batch(batch, ai_enabled, system_prompt)
-        for cid, r in zip(batch_ids, results):
-            qwen_by_case[cid] = r
+    flush_batch()
 
-    out: dict[str, IntentResult] = {}
     for case_id in order:
+        if case_id in unresolved_batches:
+            out[case_id] = _flagged_unresolved(case_id, rule_results[case_id][0], sanitize_flags_by_case[case_id])
+            continue
         rule_verdict, _rule_lang = rule_results[case_id]
         qwen = qwen_by_case[case_id]
         original_text = text_by_case[case_id]
@@ -277,7 +315,11 @@ def classify_all(requests: list, ai_enabled: bool) -> dict:
             continue
 
         # Escalate: one more single-text Qwen pass.
-        escalated_qwen = client.intent_classify_single(sanitized_text_by_case[case_id], ai_enabled, system_prompt)
+        try:
+            escalated_qwen = client.intent_classify_single(sanitized_text_by_case[case_id], ai_enabled, system_prompt)
+        except client.AIDisabledError:
+            out[case_id] = _flagged_unresolved(case_id, rule_verdict, sanitize_flags_by_case[case_id])
+            continue
         escalated_valid = _valid_substring(escalated_qwen["evidence_phrase"], original_text)
         escalated_agree = escalated_valid and escalated_qwen["intent"] != "UNCLEAR" and (
             rule_verdict == RULE_UNSURE or escalated_qwen["intent"] == rule_verdict

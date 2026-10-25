@@ -1,0 +1,52 @@
+{
+  "agreed": {
+    "document_type": "object_storage_browser",
+    "identifiers": [
+      {
+        "kind": "hash",
+        "value": "e71b6d"
+      }
+    ],
+    "observed_state_words": [
+      "Standard"
+    ],
+    "resource_ids": [],
+    "system_id": "object_storage",
+    "timestamps": [
+      "13 Feb 2026 08:00 UTC",
+      "12 Feb 18:42",
+      "11 Feb 14:17",
+      "10 Feb 09:33",
+      "11 Feb 16:05",
+      "10 Feb 11:21",
+      "12 Feb 10:08",
+      "10 Feb 23:14",
+      "12 Feb 21:56",
+      "12 Feb 2026 18:42 UTC",
+      "12 Feb 18:42",
+      "12 Feb 18:39",
+      "12 Feb 18:38"
+    ]
+  },
+  "primary_usage": {
+    "input_tokens": 2321,
+    "latency_s": 8.657,
+    "model": "gemini-3.1-flash-lite",
+    "output_tokens": 249,
+    "prompt_version": "v1",
+    "provider": "gemini",
+    "thinking_tokens": 0
+  },
+  "report": {
+    "disagreements": 0,
+    "document_type": "object_storage_browser",
+    "facts_dropped": 8,
+    "facts_extracted": 11,
+    "facts_grounded": 3,
+    "flagged": "second reader unavailable; using primary (grounded) only",
+    "second_reader_available": false,
+    "second_reader_used": false,
+    "system_id": "object_storage"
+  },
+  "second_usage": null
+}

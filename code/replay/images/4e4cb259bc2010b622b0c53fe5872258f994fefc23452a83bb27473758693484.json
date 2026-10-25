@@ -1,0 +1,51 @@
+{
+  "agreed": {
+    "document_type": "console_screenshot",
+    "identifiers": [
+      {
+        "kind": "name",
+        "value": "Omar Darwish"
+      },
+      {
+        "kind": "email",
+        "value": "darwish.omar@icloud.com"
+      }
+    ],
+    "observed_state_words": [
+      "Returning shopper"
+    ],
+    "resource_ids": [
+      "analytics_7438"
+    ],
+    "system_id": "analytics_platform",
+    "timestamps": [
+      "13 Jul 2026 14:22 UTC",
+      "21 Apr 2026 09:14 UTC",
+      "13 Jul",
+      "08 Jul",
+      "30 Jun",
+      "22 Jun"
+    ]
+  },
+  "primary_usage": {
+    "input_tokens": 2321,
+    "latency_s": 8.657,
+    "model": "gemini-3.1-flash-lite",
+    "output_tokens": 249,
+    "prompt_version": "v1",
+    "provider": "gemini",
+    "thinking_tokens": 0
+  },
+  "report": {
+    "disagreements": 0,
+    "document_type": "console_screenshot",
+    "facts_dropped": 1,
+    "facts_extracted": 6,
+    "facts_grounded": 5,
+    "flagged": "second reader unavailable; using primary (grounded) only",
+    "second_reader_available": false,
+    "second_reader_used": false,
+    "system_id": "analytics_platform"
+  },
+  "second_usage": null
+}

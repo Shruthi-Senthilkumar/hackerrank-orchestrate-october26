@@ -1,0 +1,71 @@
+{
+  "agreed": {
+    "document_type": "console_screenshot",
+    "identifiers": [
+      {
+        "kind": "name",
+        "value": "Haruka Sato"
+      },
+      {
+        "kind": "email",
+        "value": "haruka.s1838@zoho.com"
+      },
+      {
+        "kind": "phone",
+        "value": "+81 90 7610 2507"
+      }
+    ],
+    "observed_state_words": [
+      "Silver",
+      "Delivered",
+      "Returned"
+    ],
+    "resource_ids": [
+      "account_5762",
+      "support_9538"
+    ],
+    "system_id": "unknown",
+    "timestamps": [
+      "24 Sep 2026 09:14 JST",
+      "12 Sep 2026",
+      "18 Sep",
+      "28 Aug 2026",
+      "03 Sep",
+      "12 Jan 2024",
+      "24 Sep",
+      "22 Sep",
+      "18 Sep",
+      "03 Sep",
+      "28 Aug"
+    ]
+  },
+  "primary_usage": {
+    "input_tokens": 2321,
+    "latency_s": 8.657,
+    "model": "gemini-3.1-flash-lite",
+    "output_tokens": 249,
+    "prompt_version": "v1",
+    "provider": "gemini",
+    "thinking_tokens": 0
+  },
+  "report": {
+    "disagreements": 1,
+    "document_type": "console_screenshot",
+    "facts_dropped": 8,
+    "facts_extracted": 20,
+    "facts_grounded": 12,
+    "flagged": "",
+    "second_reader_available": true,
+    "second_reader_used": true,
+    "system_id": "unknown"
+  },
+  "second_usage": {
+    "input_tokens": 0,
+    "latency_s": 0.0,
+    "model": "gemini-3.8-flash",
+    "output_tokens": 0,
+    "prompt_version": "v1",
+    "provider": "gemini",
+    "thinking_tokens": 0
+  }
+}

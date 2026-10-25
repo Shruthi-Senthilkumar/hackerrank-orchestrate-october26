@@ -1,0 +1,65 @@
+{
+  "agreed": {
+    "document_type": "console_screenshot",
+    "identifiers": [
+      {
+        "kind": "email",
+        "value": "bluepeakco@outlook.com"
+      },
+      {
+        "kind": "email",
+        "value": "miller.logistics@company.com"
+      },
+      {
+        "kind": "email",
+        "value": "areed1433@gmail.com"
+      },
+      {
+        "kind": "email",
+        "value": "summit-retail@company.com"
+      }
+    ],
+    "observed_state_words": [
+      "Healthy",
+      "Verified",
+      "Completed"
+    ],
+    "resource_ids": [
+      "backup_9291",
+      "backup_9288",
+      "backup_9287",
+      "backup_9286",
+      "backup_9281"
+    ],
+    "system_id": "backup_service",
+    "timestamps": [
+      "26 Apr 02:00",
+      "29 Mar 2026",
+      "26 Jul 2026",
+      "25 Apr",
+      "24 Apr",
+      "22 Apr"
+    ]
+  },
+  "primary_usage": {
+    "input_tokens": 2321,
+    "latency_s": 8.657,
+    "model": "gemini-3.1-flash-lite",
+    "output_tokens": 249,
+    "prompt_version": "v1",
+    "provider": "gemini",
+    "thinking_tokens": 0
+  },
+  "report": {
+    "disagreements": 0,
+    "document_type": "console_screenshot",
+    "facts_dropped": 0,
+    "facts_extracted": 11,
+    "facts_grounded": 11,
+    "flagged": "second reader unavailable; using primary (grounded) only",
+    "second_reader_available": false,
+    "second_reader_used": false,
+    "system_id": "backup_service"
+  },
+  "second_usage": null
+}

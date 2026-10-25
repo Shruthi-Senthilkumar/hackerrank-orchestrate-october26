@@ -1,0 +1,19 @@
+{
+  "escalated": false,
+  "final_intent": "DELETE",
+  "flagged": false,
+  "qwen_evidence_phrase": "close my account and process the associated personal-data deletion",
+  "qwen_intent": "DELETE",
+  "qwen_language": "en",
+  "resolution": "agreement",
+  "rule_verdict": "DELETE",
+  "usage": {
+    "input_tokens": 1924,
+    "latency_s": 1.094,
+    "model": "qwen/qwen3.8-27b",
+    "output_tokens": 356,
+    "prompt_version": "v1",
+    "provider": "groq",
+    "thinking_tokens": 0
+  }
+}

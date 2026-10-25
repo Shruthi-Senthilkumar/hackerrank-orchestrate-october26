@@ -1,0 +1,57 @@
+{
+  "agreed": {
+    "document_type": "console_screenshot",
+    "identifiers": [
+      {
+        "kind": "email",
+        "value": "jain.aditi@gmail.com"
+      },
+      {
+        "kind": "email",
+        "value": "lucia-torres@gmail.com"
+      }
+    ],
+    "observed_state_words": [
+      "Healthy",
+      "Continuous",
+      "Continuous sync"
+    ],
+    "resource_ids": [
+      "data_flow_1121",
+      "data_flow_9846"
+    ],
+    "system_id": "integration_service",
+    "timestamps": [
+      "07 Aug 2026 08:00 UTC",
+      "07:59:42",
+      "07:59:36",
+      "07:59:28",
+      "07:59:13",
+      "07:59:42",
+      "07:58:10",
+      "07:56:44",
+      "07:55:02"
+    ]
+  },
+  "primary_usage": {
+    "input_tokens": 2321,
+    "latency_s": 8.657,
+    "model": "gemini-3.1-flash-lite",
+    "output_tokens": 249,
+    "prompt_version": "v1",
+    "provider": "gemini",
+    "thinking_tokens": 0
+  },
+  "report": {
+    "disagreements": 0,
+    "document_type": "console_screenshot",
+    "facts_dropped": 2,
+    "facts_extracted": 8,
+    "facts_grounded": 6,
+    "flagged": "second reader unavailable; using primary (grounded) only",
+    "second_reader_available": false,
+    "second_reader_used": false,
+    "system_id": "integration_service"
+  },
+  "second_usage": null
+}

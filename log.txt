@@ -1231,3 +1231,28 @@ branch=main
 repo_root=/home/claude/hackerrank-orchestrate-october26
 worktree=main
 parent_agent=none
+
+## [2026-10-25T08:24:31Z] FINAL PHASE: replay cache, keyless proof, final run, reports, packager
+
+User Prompt (verbatim, secrets redacted):
+Final-phase prompt, 40-minute hard limit: replay cache (code/replay/) for keyless reproduction; keyless clean-checkout proof (pytest + --no-ai with .cache/ and keys absent, byte-identical to live); final 518-case run + usage report; real evaluation_report.md; at least three custom evaluation cases; quick harden; root README.md with approach overview; submission packager with seven preflight checks; final commit with output.csv and code/replay/, log entry last, log.txt copied into submission/ last, push.
+
+Agent Response Summary:
+Built code/audit/llm/replay.py and code/tools/build_replay_cache.py: committed code/replay/{intent,images}/ keyed by SHA-256 of request text / image bytes, each with its original usage. Wired replay as the first lookup in intent.classify_all and image_reader.read_image (OCR/onnxruntime now imported lazily, only on a replay miss), with AIDisabledError caught per-batch/per-call so a missing entry flags NOT_APPLICABLE (D10) instead of crashing. Proved keylessly: hid .cache/ and unset both API keys, ran pytest (167 passed) and `python code/main.py --no-ai` (exit 0), output.csv byte-identical (sha256 match) to the live run. Ran the final 518-case run (0 live calls, COMPLETE=163/INCOMPLETE=345/NOT_APPLICABLE=10) and regenerated usage_report.md from replay entries. Extended code/evaluation/main.py with build_evaluation_report() -> real evaluation_report.md (case/row/step accuracy, error taxonomy, D17 statement, intent/image/security summaries, failures-and-improvements section sourced from DECISIONS.md/log.txt). Added code/tests/test_custom_evaluation_cases.py (4 synthetic cases: replica-drift INCOMPLETE, tombstone+audit+anonymized-analytics COMPLETE, active-flow+restorable-backup remediation ordering, non-deletion NOT_APPLICABLE). Cut per the prompt's own priority: task 6's extra hardening checks beyond what Phase 3 already proved (hash-seed determinism was already proven there). Rewrote README.md with an Approach overview, models table, security controls, known limits, and repo layout. Built code/tools/package_submission.py running all 7 SUBMISSION.md preflight checks, including a real clean-checkout (copies code/+dataset/ to a scratch dir, runs with no keys in the environment, sha256-compares output.csv) -- all 7 PASS on the first run.
+
+Actions:
+* wrote: code/audit/llm/replay.py, code/tools/{build_replay_cache,package_submission}.py, code/tests/test_custom_evaluation_cases.py
+* edited: code/audit/intent.py, code/audit/evidence/image_reader.py, code/evaluation/main.py, code/tools/make_usage_report.py, README.md
+* cmd: pytest (keyless, .cache/ hidden, keys unset) -> 167 passed
+* cmd: python code/main.py --no-ai (keyless) -> exit 0, sha256 matches the live run's output.csv
+* cmd: python code/main.py (final, live keys present) -> 0 live calls, 518 rows, COMPLETE=163/INCOMPLETE=345/NOT_APPLICABLE=10
+* cmd: python code/evaluation/main.py -> evaluation_report.md written
+* cmd: python code/tools/package_submission.py -> all 7 preflight checks PASS, submission/code.zip 0.4 MB
+
+Context:
+tool=Claude Code
+model=claude-sonnet-5
+branch=main
+repo_root=C:\Users\shrut\hackerrank-orchestrate-october26
+worktree=main
+parent_agent=none

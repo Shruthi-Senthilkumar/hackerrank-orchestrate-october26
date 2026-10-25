@@ -41,6 +41,29 @@ The blank template at `dataset/output.csv` is provided as a reference. Your fina
 
 ---
 
+## Approach overview
+
+Code decides; models only extract or classify (C1) -- no model output is ever treated as a
+verdict. A time-travel gateway (`code/audit/timeview.py`) is the only way any case-level logic
+reads the dataset's time-dependent tables, so every answer reflects only what was visible at that
+case's own `audit_at`, never later evidence. Identity resolution (`code/audit/identity.py`)
+reconstructs a person's current and historical identifiers from `user_identities.csv` and
+`user_audit_log.csv`. Evidence parsing (`code/audit/evidence/`) normalizes SQL, JSON, log, text,
+PDF, and image evidence into a common `Observation` model; the linker
+(`code/audit/linker.py`) connects observations to a resolved identity only through a grounded
+relationship (a shared identifier, a trace correlation, a same-document mention, or one directed,
+hub-guarded reference hop) -- never an ID-number pattern, a time window, or ordering. The policy
+engine, detectors, decision, and planner (`code/audit/policy.py`, `detectors.py`, `decision.py`,
+`planner.py`) apply `deletion_rules.csv` to every linked resource and produce the ordered
+FINDING/REMEDIATION/VERIFICATION step list. The guarded AI layer (`code/audit/intent.py`,
+`code/audit/evidence/image_reader.py`, `code/audit/llm/`) classifies a request's true intent
+(Groq Qwen plus a deterministic multilingual rule layer) and extracts structured facts from the 11
+evidence images (local OCR grounding plus two independent Gemini readers, agreement-only), with
+every call cached and a committed `code/replay/` snapshot so the pipeline reproduces without any
+live call or key. Security (`code/audit/security/sanitize.py`) treats every piece of external text
+as untrusted data, never an instruction. Evaluation (`code/evaluation/`) scores the 32 labelled
+public samples and reports intent, image, and security test results.
+
 ## Setup and Run
 
 Status as of Phase 3b: the rules-only baseline is implemented end to end.
@@ -261,3 +284,60 @@ Before submitting, confirm that:
 - `code.zip` includes your runnable code, `README.md`, `code/evaluation/evaluation_report.md`, and `code/evaluation/usage_report.md`;
 - `log.txt` follows the `AGENTS.md` turn format and is uploaded to the `chat_transcript` slot; and
 - no API keys, credentials, real personal data, or sensitive configuration values are included.
+
+Build the submission zip with `python code/tools/package_submission.py`, which runs all seven
+preflight checks from `claude_terminal/SUBMISSION.md` section 4 (including a clean-clone,
+no-keys, byte-identical reproduction check) and refuses to produce `submission/code.zip` if any
+fail.
+
+---
+
+## Models and jobs
+
+| Model | Provider | Job |
+|---|---|---|
+| `qwen/qwen3.8-27b` | Groq | Intent classification (F13), batched 8 per call |
+| `gemini-3.1-flash-lite` | Google Gemini | Primary image reader (F05) |
+| `gemini-3.8-flash` | Google Gemini | Second image reader, budgeted (~20 requests/day) |
+| RapidOCR (onnxruntime) | Local, not an LLM | Grounding source for image extraction only |
+
+Every model call is cached by content hash (`.cache/`, git-ignored) and replayed from the
+committed `code/replay/` snapshot so re-runs and clean checkouts need zero live calls.
+
+## Security controls
+
+Untrusted text (request text, evidence content, OCR output) is NFKC-normalized, stripped of
+zero-width/control characters, scanned for instruction-like phrases in every language found in
+the dataset (English, Spanish, French, Portuguese, Japanese, Korean) and for large encoded
+blobs, then wrapped in explicit untrusted-data delimiters before reaching any model. Models
+return only a strict JSON schema (enums, required fields, `additionalProperties: false`);
+invalid output is rejected, never repaired by guessing. See `code/audit/security/sanitize.py`
+and the I1-I8 security tests in `code/tests/test_security_injection.py`.
+
+## Known limits
+
+- **D17 (step-level ceiling)**: a resource unattributable from visible evidence (an identity-less
+  404, a fully anonymized record, or evidence captured after `audit_at`) is never reported, by
+  design -- status accuracy is the primary metric; step-level recall on the 32 samples is below
+  100% because of this, not because of a bug (see `code/evaluation/evaluation_report.md`).
+- Both model providers are used on free tiers with real rate limits; the second image reader
+  (`gemini-3.8-flash`) is slow (observed 142-313s per call) and budgeted to ~20 requests/day, so
+  it is used sparingly and falls back to the grounded primary reader alone when unavailable.
+- 18 sample cases were originally zero-step `COMPLETE`; investigation traced each to either truly
+  no visible evidence, a now-fixed parser gap, or evidence captured after that case's `audit_at`
+  (never a case that should have been `INCOMPLETE` and was silently missed).
+
+## Repository layout
+
+```
+code/
+  main.py                 entry point: python code/main.py [--no-ai] [--cases ...] [--trace]
+  config.py                non-secret configuration
+  audit/                   identity, linking, policy, decision, planner, intent, security, llm/
+  evidence/                SQL/JSON/log/text/PDF/image parsers
+  prompts/                 versioned model prompts
+  evaluation/               scorer, evaluation_report.md, usage_report.md, intent/image reports
+  replay/                  committed model-result replay cache (intent + images)
+  tools/                    usage report generator, submission packager
+  tests/                    pytest suite (167+ tests)
+```

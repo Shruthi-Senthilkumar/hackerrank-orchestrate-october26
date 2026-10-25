@@ -88,16 +88,51 @@ def build_report(entries: list[dict]) -> str:
     return "\n".join(lines) + "\n"
 
 
+def _replay_entries() -> list[dict]:
+    """A replay hit never touches code/audit/llm/usage.py's ledger
+    (the whole point is zero network calls), so this run's real usage
+    report must separately count code/replay/ entries, each with its
+    ORIGINAL usage, as a cache_hit=True logical request."""
+    import json
+
+    from audit.llm import replay
+
+    out = []
+    for p in replay.INTENT_DIR.glob("*.json"):
+        d = json.loads(p.read_text(encoding="utf-8"))
+        u = d["usage"]
+        out.append({
+            "provider": u["provider"], "model": u["model"], "prompt_version": u["prompt_version"],
+            "input_tokens": u["input_tokens"], "output_tokens": u["output_tokens"],
+            "thinking_tokens": u.get("thinking_tokens", 0), "latency_s": 0.0,
+            "cache_hit": True, "error": "",
+        })
+    for p in replay.IMAGE_DIR.glob("*.json"):
+        d = json.loads(p.read_text(encoding="utf-8"))
+        for key in ("primary_usage", "second_usage"):
+            u = d.get(key)
+            if u:
+                out.append({
+                    "provider": u["provider"], "model": u["model"], "prompt_version": u["prompt_version"],
+                    "input_tokens": u["input_tokens"], "output_tokens": u["output_tokens"],
+                    "thinking_tokens": u.get("thinking_tokens", 0), "latency_s": 0.0,
+                    "cache_hit": True, "error": "",
+                })
+    return out
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--out", default=str(REPO_ROOT / "code" / "evaluation" / "usage_report.md"))
+    parser.add_argument("--replay-only", action="store_true", help="count only code/replay/ entries, not the dev-time ledger")
     args = parser.parse_args()
 
-    entries = usage.read_all()
+    entries = [] if args.replay_only else usage.read_all()
+    entries = entries + _replay_entries()
     report = build_report(entries)
     out_path = Path(args.out)
     out_path.write_text(report, encoding="utf-8")
-    print(f"wrote {out_path} from {len(entries)} ledger entries")
+    print(f"wrote {out_path} from {len(entries)} entries")
     return 0
 
 

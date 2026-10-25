@@ -1,0 +1,56 @@
+{
+  "agreed": {
+    "document_type": "console_screenshot",
+    "identifiers": [
+      {
+        "kind": "name",
+        "value": "user_03"
+      }
+    ],
+    "observed_state_words": [
+      "Valid"
+    ],
+    "resource_ids": [
+      "audit_record_003",
+      "audit_record_002",
+      "audit_record_001",
+      "audit_record_006",
+      "audit_record_005",
+      "audit_record_004"
+    ],
+    "system_id": "security_service",
+    "timestamps": [
+      "25 Aug 04:03",
+      "25 Aug 03:21",
+      "24 Aug 16:14",
+      "22 Aug 11:27",
+      "20 Aug 09:42",
+      "18 Aug 14:05",
+      "2026-08-25T04:03:00Z",
+      "25 Aug",
+      "24 Aug",
+      "22 Aug"
+    ]
+  },
+  "primary_usage": {
+    "input_tokens": 2321,
+    "latency_s": 8.657,
+    "model": "gemini-3.1-flash-lite",
+    "output_tokens": 249,
+    "prompt_version": "v1",
+    "provider": "gemini",
+    "thinking_tokens": 0
+  },
+  "report": {
+    "disagreements": 0,
+    "document_type": "console_screenshot",
+    "facts_dropped": 1,
+    "facts_extracted": 10,
+    "facts_grounded": 9,
+    "flagged": "second reader unavailable; using primary (grounded) only",
+    "second_reader_available": false,
+    "second_reader_used": false,
+    "system_id": "security_service"
+  },
+  "second_usage": null
+}

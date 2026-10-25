@@ -1,0 +1,73 @@
+{
+  "agreed": {
+    "document_type": "console_screenshot",
+    "identifiers": [
+      {
+        "kind": "email",
+        "value": "marcus.lee@northstar.shop"
+      },
+      {
+        "kind": "email",
+        "value": "ingrid.dahl@outlook.com"
+      },
+      {
+        "kind": "email",
+        "value": "sara.kim@northstar.shop"
+      },
+      {
+        "kind": "email",
+        "value": "daniel.park@northstar.shop"
+      },
+      {
+        "kind": "hash",
+        "value": "SHA-256 - 41ca09..."
+      }
+    ],
+    "observed_state_words": [
+      "Collecting",
+      "Ready",
+      "Packaging",
+      "Ready"
+    ],
+    "resource_ids": [
+      "export_1261",
+      "export_1260",
+      "export_1259",
+      "export_1258"
+    ],
+    "system_id": "export_service",
+    "timestamps": [
+      "20 Jun 14:18 UTC",
+      "18 Jun 06:42 UTC",
+      "17 Jun 11:03 UTC",
+      "16 Jun 09:27 UTC",
+      "18 Jun 2026 06:42 UTC",
+      "25 Jun 2026 06:42 UTC",
+      "06:46",
+      "06:45",
+      "06:43",
+      "06:42"
+    ]
+  },
+  "primary_usage": {
+    "input_tokens": 2321,
+    "latency_s": 8.657,
+    "model": "gemini-3.1-flash-lite",
+    "output_tokens": 249,
+    "prompt_version": "v1",
+    "provider": "gemini",
+    "thinking_tokens": 0
+  },
+  "report": {
+    "disagreements": 0,
+    "document_type": "console_screenshot",
+    "facts_dropped": 0,
+    "facts_extracted": 11,
+    "facts_grounded": 11,
+    "flagged": "second reader unavailable; using primary (grounded) only",
+    "second_reader_available": false,
+    "second_reader_used": false,
+    "system_id": "export_service"
+  },
+  "second_usage": null
+}

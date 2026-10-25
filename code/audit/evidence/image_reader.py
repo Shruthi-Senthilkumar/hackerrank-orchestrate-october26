@@ -30,11 +30,14 @@ from typing import Optional
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 from audit import mapping  # noqa: E402
-from audit.evidence.ocr_adapter import ocr_text  # noqa: E402
-from audit.llm import client  # noqa: E402
+from audit.llm import client, replay  # noqa: E402
 from audit.models import DocumentHint, Observation  # noqa: E402
 from audit.security import sanitize  # noqa: E402
 import config  # noqa: E402
+
+# ocr_adapter (and its onnxruntime import) is loaded lazily, only when
+# a replay entry is NOT already available -- the keyless replay path
+# must never import onnxruntime at all (final-phase task 1).
 
 PROMPT_PATH = Path(__file__).resolve().parent.parent.parent / "prompts" / "vision_v1.md"
 
@@ -117,8 +120,21 @@ def read_image(
 ) -> tuple[Optional[dict], ImageReadReport]:
     """Returns (agreed_facts_or_none, report). agreed_facts is None
     only if nothing at all survived (every field dropped)."""
+    replayed = replay.get_image(image_bytes)
+    if replayed is not None:
+        r = replayed["report"]
+        return replayed["agreed"], ImageReadReport(
+            file_id=file_id, document_type=r["document_type"], system_id=r["system_id"],
+            facts_extracted=r["facts_extracted"], facts_grounded=r["facts_grounded"],
+            facts_dropped=r["facts_dropped"], disagreements=r["disagreements"],
+            second_reader_used=r["second_reader_used"], second_reader_available=r["second_reader_available"],
+            flagged=r["flagged"], agreed=replayed["agreed"],
+        )
+
     system_ids = mapping.all_system_ids()
     prompt = _load_vision_prompt()
+    from audit.evidence.ocr_adapter import ocr_text  # lazy: only reached on a replay miss
+
     raw_ocr = ocr_text(image_bytes)
     masked_ocr, _flags = sanitize.sanitize(raw_ocr)  # OCR text can carry injected text too
 

@@ -1,0 +1,66 @@
+{
+  "agreed": {
+    "document_type": "support_record",
+    "identifiers": [
+      {
+        "kind": "name",
+        "value": "Kofi Agyeman"
+      },
+      {
+        "kind": "email",
+        "value": "kagyeman8947@fastmail.com"
+      },
+      {
+        "kind": "name",
+        "value": "Maya Chen"
+      }
+    ],
+    "observed_state_words": [
+      "Normal priority",
+      "In transit"
+    ],
+    "resource_ids": [],
+    "system_id": "support_platform",
+    "timestamps": [
+      "26 May",
+      "09:12",
+      "09:13",
+      "09:28",
+      "09:35",
+      "22 May",
+      "23 May",
+      "24 May 07:46",
+      "24 May 08:15",
+      "26 May 2026"
+    ]
+  },
+  "primary_usage": {
+    "input_tokens": 2321,
+    "latency_s": 8.657,
+    "model": "gemini-3.1-flash-lite",
+    "output_tokens": 249,
+    "prompt_version": "v1",
+    "provider": "gemini",
+    "thinking_tokens": 0
+  },
+  "report": {
+    "disagreements": 0,
+    "document_type": "support_record",
+    "facts_dropped": 3,
+    "facts_extracted": 13,
+    "facts_grounded": 10,
+    "flagged": "",
+    "second_reader_available": true,
+    "second_reader_used": true,
+    "system_id": "support_platform"
+  },
+  "second_usage": {
+    "input_tokens": 0,
+    "latency_s": 0.0,
+    "model": "gemini-3.8-flash",
+    "output_tokens": 0,
+    "prompt_version": "v1",
+    "provider": "gemini",
+    "thinking_tokens": 0
+  }
+}
